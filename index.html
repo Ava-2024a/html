@@ -1,0 +1,2694 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大学生课程助手</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* 全局手机容器样式 */
+        .phone-container {
+            width: 402px;
+            height: 874px;
+            border-radius: 40px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.3);
+            position: relative;
+            overflow: hidden;
+            background: #fff;
+            transform: scale(0.85);
+            transform-origin: top center;
+        }
+        .phone-notch {
+            width: 200px;
+            height: 30px;
+            background: #000;
+            border-radius: 0 0 20px 20px;
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+        }
+        .phone-content {
+            width: 100%;
+            height: calc(100% - 80px);
+            overflow: hidden;
+            position: relative;
+            margin-top: 35px;
+        }
+        .tab-content {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        .tab-content.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 3px;
+        }
+        /* 动画 */
+        .fade-scale {
+            animation: fadeScale 0.3s ease forwards;
+        }
+        @keyframes fadeScale {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .slide-up {
+            animation: slideUp 0.3s ease forwards;
+        }
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+        .breath {
+            animation: breath 2s infinite ease-in-out;
+        }
+        @keyframes breath {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.9; }
+        }
+        /* 课程表网格 */
+        .course-grid {
+            display: grid;
+            grid-template-columns: 80px repeat(7, 1fr);
+            grid-template-rows: 40px repeat(4, 80px);
+            gap: 2px;
+        }
+        .grid-header {
+            background: #f3f4f6;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-weight: 500;
+        }
+        .time-cell {
+            background: f9fafb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            text-align: center;
+        }
+        .course-cell {
+            border-radius: 4px;
+            padding: 4px;
+            font-size: 11px;
+            color: white;
+            overflow: hidden;
+        }
+
+        /* 手机内部弹窗样式 - 核心修复 */
+        .phone-modal {
+            position: absolute;
+            z-index: 999;
+        }
+        .modal-inside {
+            position: absolute;
+            inset: 0;
+            z-index: 998;
+        }
+
+        /* ========== 你要的核心修复：高度自适应内容，不留空白，不铺满屏幕 ========== */
+        /* 添加闹钟弹窗 - 纯内容高度，无多余空白 */
+        #add-alarm-modal {
+            height: auto !important;
+            max-height: 85vh !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            overflow: visible !important;
+        }
+
+        /* 搜索结果淡入动画 */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 一键设置闹钟弹窗 - 纯内容高度，紧凑显示 */
+        #alarm-batch-modal {
+            height: auto !important;
+            max-height: 80vh !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            overflow: visible !important;
+        }
+        
+        /* 确认清除弹窗 - 纯内容高度，紧凑显示 */
+        #confirm-clear-modal {
+            height: auto !important;
+            max-height: 30vh !important;
+            top: 30% !important;
+            transform: translateY(-50%) !important;
+            overflow: visible !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+    <!-- 手机外壳 -->
+    <div class="phone-container">
+        <div class="phone-notch"></div>
+        <!-- 顶部状态栏 -->
+        <div class="absolute top-0 left-0 w-full h-8 flex items-center justify-between px-6 text-sm font-medium z-10">
+            <span>14:30</span>
+            <div class="flex gap-1">
+                <i class="fa-solid fa-signal"></i>
+                <i class="fa-solid fa-wifi"></i>
+                <i class="fa-solid fa-battery-full"></i>
+            </div>
+        </div>
+
+        <!-- 内容区域 -->
+        <div class="phone-content">
+            <!-- 课程页 - 默认页面 -->
+            <div id="course-tab" class="tab-content active">
+                <div class="h-2/3 overflow-y-auto bg-gray-50 relative" id="course-area">
+                    <!-- 未上传状态 -->
+                    <div id="course-empty" class="h-full flex flex-col items-center justify-center">
+                        <i class="fa-solid fa-camera text-6xl text-gray-300 mb-4"></i>
+                        <p class="text-gray-500 text-lg">点击拍照上传课程表</p>
+                    </div>
+                    <!-- 已上传状态 -->
+                    <div id="course-loaded" class="h-full hidden p-4 relative">
+                        <div class="flex justify-between items-center mb-4">
+                            <div>
+                                <select id="week-select" class="text-lg font-bold border-none bg-transparent focus:outline-none">
+                                    <option value="1">第一周</option>
+                                    <option value="2">第二周</option>
+                                </select>
+                                <p class="text-sm text-gray-500" id="current-date">2024/05/20</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button id="re-upload-btn" class="px-2 py-1 bg-blue-100 text-blue-600 rounded text-sm">
+                                    <i class="fa-solid fa-camera"></i>
+                                </button>
+                                <button id="add-course-btn" class="px-2 py-1 bg-blue-500 text-white rounded text-sm">新建课程</button>
+                                <button id="clear-course-btn" class="px-2 py-1 bg-red-100 text-red-500 rounded text-sm">清空列表</button>
+                            </div>
+                        </div>
+                        <div id="course-grid-wrapper" class="course-grid">
+                        </div>
+                    </div>
+                    <!-- Loading状态 -->
+                    <div id="course-loading" class="h-full hidden flex items-center justify-center bg-white bg-opacity-80 absolute top-0 left-0 w-full">
+                        <div class="flex flex-col items-center justify-center">
+                            <div class="spinner border-4 border-t-blue-500 border-gray-200 rounded-full w-12 h-12 animate-spin mb-4 mx-auto"></div>
+                            <p class="text-gray-600">正在识别课程...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 闹钟区 - 吸顶标题 + 高度修复 -->
+                <div class="h-1/3 bg-white border-t overflow-hidden flex flex-col">
+                    <div class="sticky top-0 bg-white z-10 flex justify-between items-center p-4 border-b">
+                        <h3 class="font-bold">课程闹钟</h3>
+                        <button id="add-alarm-btn" class="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center">
+                            <i class="fa-solid fa-plus"></i>
+                        </button>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-4 pb-[50px]">
+                        <div id="alarm-empty" class="text-center text-gray-400 py-8">暂无课程闹钟</div>
+                        <div id="alarm-list" class="hidden space-y-2"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 搜索页 -->
+            <div id="search-tab" class="tab-content h-full">
+                <div class="p-4">
+                    <div class="relative mb-4" style="z-index: 1;">
+                        <input id="search-input" placeholder="搜索作业、考试或文档..." class="w-full h-12 px-4 pr-24 rounded-lg focus:outline-none" style="background-color: #F5F5F5;">
+                        <div class="absolute right-4 top-1/2 -translate-y-1/2 flex gap-3 items-center">
+                            <i id="search-clear-btn" class="fa-solid fa-xmark text-gray-400 cursor-pointer" style="display: none;"></i>
+                            <i id="voice-icon" class="fa-solid fa-microphone text-gray-400 cursor-pointer"></i>
+                            <i id="search-trigger-btn" class="fa-solid fa-magnifying-glass text-gray-400 cursor-pointer"></i>
+                        </div>
+                    </div>
+                </div>
+                <div id="voice-to-text-area" class="hidden px-4 mb-2">
+                    <div class="flex items-center justify-center gap-2 bg-blue-50 rounded-lg p-3">
+                        <i id="voice-stop-icon" class="fa-solid fa-microphone text-blue-500 text-xl cursor-pointer"></i>
+                        <span class="text-blue-600 text-sm">正在语音转文字</span>
+                    </div>
+                </div>
+                <div id="todo-panel" class="rounded-lg bg-gray-50 p-4 mx-4 overflow-y-auto" style="position: absolute; left: 0; right: 0; bottom: 60px; top: 180px;">
+                    <h3 class="font-bold py-2 mb-2">未完成待办</h3>
+                    <div id="search-todo-list" class="space-y-2"></div>
+                </div>
+                <!-- 沉浸式搜索 - 手机内部 -->
+                <div id="search-full" class="hidden phone-modal top-0 left-0 right-0 bottom-20 bg-white p-4">
+                    <div class="flex items-center gap-2 mb-4">
+                        <i id="close-search" class="fa-solid fa-arrow-left text-xl cursor-pointer"></i>
+                        <div class="flex-1 relative">
+                            <input id="search-full-input" placeholder="搜索作业、考试或文档..." class="w-full h-12 px-4 pr-16 rounded-lg focus:outline-none" style="background-color: #F5F5F5;">
+                            <div class="absolute right-4 top-1/2 -translate-y-1/2 flex gap-3 items-center">
+                                <i id="search-full-clear-btn" class="fa-solid fa-xmark text-gray-400 cursor-pointer" style="display: none;"></i>
+                                <i class="fa-solid fa-magnifying-glass text-gray-400 cursor-pointer"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="recent-search-area" class="mb-4">
+                        <h4 class="text-gray-500 mb-2">最近搜索</h4>
+                        <div class="flex flex-wrap gap-2">
+                            <span class="search-tag px-3 py-1 bg-gray-100 rounded-full text-sm cursor-pointer hover:bg-blue-100 hover:text-blue-600">高数线代</span>
+                            <span class="search-tag px-3 py-1 bg-gray-100 rounded-full text-sm cursor-pointer hover:bg-blue-100 hover:text-blue-600">英语四级</span>
+                            <span class="search-tag px-3 py-1 bg-gray-100 rounded-full text-sm cursor-pointer hover:bg-blue-100 hover:text-blue-600">Java作业</span>
+                            <span class="search-tag px-3 py-1 bg-gray-100 rounded-full text-sm cursor-pointer hover:bg-blue-100 hover:text-blue-600">期末考安排</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 搜索结果区域 -->
+                    <div id="search-results-area" class="hidden flex-1 overflow-y-auto">
+                        <!-- AI总结卡片 -->
+                        <div id="ai-summary-card" class="bg-blue-50 rounded-xl p-4 mb-4 hidden">
+                            <div class="flex items-center gap-2 mb-2">
+                                <i class="fa-solid fa-robot text-blue-500"></i>
+                                <span class="font-bold text-blue-600">AI智能总结</span>
+                            </div>
+                            <p id="ai-summary-text" class="text-gray-700"></p>
+                        </div>
+                        <!-- 文档链接区 -->
+                        <div id="search-docs-area" class="hidden space-y-2">
+                            <h4 class="font-bold mb-2">相关文档</h4>
+                            <div id="search-docs-list"></div>
+                        </div>
+                        <!-- 相关待办区 -->
+                        <div id="search-todos-area" class="hidden space-y-2 mt-4">
+                            <h4 class="font-bold mb-2">搜索相关待办</h4>
+                            <div id="search-todos-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 待办页 -->
+            <div id="todo-tab" class="tab-content">
+                <!-- 通知栏 -->
+                <div class="p-3" style="background-color: #E0EEFF;">
+                    <!-- 通知1 - 陈老师考试信息 -->
+                    <div id="notice1" class="flex justify-between items-center mb-2">
+                        <p class="text-sm">AI监测到用户"陈老师"发布考试时间信息</p>
+                        <div class="flex gap-1">
+                            <button id="notice1-set-btn" class="text-xs bg-blue-500 text-white px-3 py-1 rounded w-14 text-center">立即设置</button>
+                            <button id="notice1-browse-btn" class="text-xs bg-gray-200 px-3 py-1 rounded w-10 text-center">浏览</button>
+                            <button id="notice1-close-btn" class="text-xs text-gray-500">×</button>
+                        </div>
+                    </div>
+                    <!-- 通知1展开内容 -->
+                    <div id="notice1-detail" class="hidden bg-white rounded-lg p-3 mb-3 border">
+                        <div class="flex items-start gap-2">
+                            <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white flex-shrink-0">
+                                <i class="fa-brands fa-qq text-sm"></i>
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-sm font-medium">高等数学2</span>
+                                    <span class="text-xs text-gray-500">陈老师</span>
+                                </div>
+                                <p class="text-sm text-gray-600">通知：5.21下午2点半-4点半期中考试！请大家按要求携带学生证和身份证准时参加。</p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- 通知2 - 21级计算机群作业 -->
+                    <div id="notice2" class="flex justify-between items-center">
+                        <p class="text-sm">AI监测到"21级计算机群"有新作业：第10周练习.pdf</p>
+                        <div class="flex gap-1">
+                            <button id="notice2-set-btn" class="text-xs bg-blue-500 text-white px-3 py-1 rounded w-14 text-center">立即设置</button>
+                            <button id="notice2-browse-btn" class="text-xs bg-gray-200 px-3 py-1 rounded w-10 text-center">浏览</button>
+                            <button id="notice2-close-btn" class="text-xs text-gray-500">×</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- 待办列表 -->
+                <div class="p-4 pb-24">
+                    <h3 class="font-bold mb-2">未完成</h3>
+                    <div id="unfinished-todo" class="space-y-2 mb-6"></div>
+                    <div class="border-t pt-4">
+                        <h3 class="text-gray-500 mb-2">已完成 · 今天</h3>
+                        <div id="finished-todo" class="space-y-2"></div>
+                    </div>
+                </div>
+                <!-- 语音按钮 -->
+                <div class="absolute bottom-24 left-1/2 -translate-x-1/2">
+                    <button id="voice-btn" class="w-16 h-16 rounded-full bg-blue-500 text-white flex items-center justify-center breath">
+                        <i class="fa-solid fa-microphone text-2xl"></i>
+                    </button>
+                </div>
+                <!-- 语音聆听状态 -->
+                <div id="voice-listening" class="hidden absolute bottom-24 left-1/2 -translate-x-1/2 text-center">
+                    <div class="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center mb-2">
+                        <i class="fa-solid fa-microphone text-2xl text-white"></i>
+                    </div>
+                    <p class="text-sm text-gray-600">正在聆听...</p>
+                </div>
+            </div>
+
+            <!-- 个人页 -->
+            <div id="profile-tab" class="tab-content">
+                <div class="p-4 pb-2 overflow-y-auto" style="height: calc(100% - 60px);">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold">个人中心</h2>
+                        <button id="add-account-btn" class="px-3 py-1 bg-blue-500 text-white rounded text-sm">添加关联账号</button>
+                    </div>
+                    <!-- 账号列表 -->
+                    <div class="border rounded-lg overflow-hidden mb-6" style="max-height: 320px;">
+                        <div id="account-header" class="flex items-center justify-between p-3 border-b cursor-pointer">
+                            <div class="flex items-center gap-2">
+                                <div class="w-10 h-10 rounded-full bg-blue-400 flex items-center justify-center text-white">
+                                    <i class="fa-brands fa-qq"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium">我的QQ</p>
+                                    <p class="text-xs text-gray-500">123456789</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button id="add-group-btn" class="text-blue-500 px-2"><i class="fa-solid fa-plus"></i></button>
+                                <i id="account-arrow" class="fa-solid fa-chevron-down text-gray-400 transition-transform"></i>
+                            </div>
+                        </div>
+                        <!-- 群聊列表 -->
+                        <div id="group-list" class="hidden p-4 space-y-4 overflow-y-auto" style="max-height: 250px;">
+                            <!-- 群聊条目会通过JS动态渲染 -->
+                        </div>
+                    </div>
+                    <!-- 我的文件 - 文件夹视图 -->
+                    <div id="folder-view" class="mt-2">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="font-bold">我的文件</h3>
+                            <div id="folder-header-btns" class="flex gap-2">
+                                <button id="folder-delete-btn" class="text-gray-500"><i class="fa-solid fa-trash"></i></button>
+                                <button id="folder-add-btn" class="text-blue-500"><i class="fa-solid fa-plus"></i></button>
+                            </div>
+                            <div id="folder-batch-btns" class="hidden flex gap-2">
+                                <button id="folder-cancel-btn" class="px-3 py-1 text-sm">取消</button>
+                                <button id="folder-confirm-delete-btn" class="px-3 py-1 bg-red-500 text-white rounded text-sm">确认删除</button>
+                            </div>
+                        </div>
+                        <div id="folder-list" class="grid grid-cols-3 gap-4 max-h-[200px] overflow-y-auto pt-2 mt-10">
+                            <!-- 文件夹会通过JS动态渲染 -->
+                        </div>
+                    </div>
+                    <!-- 文件列表视图 -->
+                    <div id="file-view" class="hidden">
+                        <div class="flex justify-between items-center mb-3">
+                            <div class="flex items-center gap-2">
+                                <button id="back-to-folder-btn" class="text-gray-500"><i class="fa-solid fa-arrow-left"></i></button>
+                                <h3 id="current-folder-name" class="font-bold"></h3>
+                            </div>
+                            <div id="file-header-btns" class="flex gap-2">
+                                <button id="file-delete-btn" class="text-gray-500"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                            <div id="file-batch-btns" class="hidden flex gap-2">
+                                <button id="file-cancel-btn" class="px-3 py-1 text-sm">取消</button>
+                                <button id="file-confirm-delete-btn" class="px-3 py-1 bg-red-500 text-white rounded text-sm">确认删除</button>
+                            </div>
+                        </div>
+                        <div id="file-list" class="space-y-2">
+                            <!-- 文件会通过JS动态渲染 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 新建文件夹弹窗 -->
+            <div id="new-folder-modal" class="hidden phone-modal inset-0 bg-black/50 flex items-center justify-center p-4">
+                <div class="bg-white rounded-xl p-6 w-full max-w-sm">
+                    <div class="flex flex-col items-center mb-4">
+                        <i class="fa-solid fa-folder-plus text-yellow-400 text-5xl mb-3"></i>
+                        <input id="new-folder-name" type="text" placeholder="请输入文件夹名称" class="w-full border rounded-lg p-3 text-center focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="flex gap-3">
+                        <button id="cancel-new-folder" class="flex-1 py-2 text-gray-600 rounded-lg border">取消</button>
+                        <button id="confirm-new-folder" class="flex-1 py-2 bg-blue-500 text-white rounded-lg">确定</button>
+                    </div>
+                </div>
+            </div>
+            <!-- 确认删除文件夹弹窗 -->
+            <div id="confirm-folder-delete-modal" class="hidden phone-modal inset-0 bg-black/50 flex items-center justify-center p-4">
+                <div class="bg-white rounded-xl p-6 w-full max-w-sm">
+                    <p class="text-center mb-4">文件夹删除后无法恢复</p>
+                    <div class="flex gap-3">
+                        <button id="cancel-folder-delete" class="flex-1 py-2 text-gray-600 rounded-lg border">取消</button>
+                        <button id="confirm-folder-delete" class="flex-1 py-2 bg-red-500 text-white rounded-lg">确定</button>
+                    </div>
+                </div>
+            </div>
+            <!-- 确认删除文件弹窗 -->
+            <div id="confirm-file-delete-modal" class="hidden phone-modal inset-0 bg-black/50 flex items-center justify-center p-4">
+                <div class="bg-white rounded-xl p-6 w-full max-w-sm">
+                    <p class="text-center mb-4">文件删除后无法恢复</p>
+                    <div class="flex gap-3">
+                        <button id="cancel-file-delete" class="flex-1 py-2 text-gray-600 rounded-lg border">取消</button>
+                        <button id="confirm-file-delete" class="flex-1 py-2 bg-red-500 text-white rounded-lg">确定</button>
+                    </div>
+                </div>
+            </div>
+            <!-- QQ登录弹窗 -->
+            <div id="qq-login-modal" class="hidden phone-modal inset-0 bg-white">
+                <div class="p-4">
+                    <div class="flex items-center mb-4">
+                        <button id="close-qq-login" class="text-gray-600"><i class="fa-solid fa-arrow-left text-xl"></i></button>
+                    </div>
+                    <div class="flex flex-col items-center mt-8">
+                        <div class="w-20 h-20 rounded-full bg-blue-500 flex items-center justify-center text-white mb-4">
+                            <i class="fa-brands fa-qq text-4xl"></i>
+                        </div>
+                        <h2 class="text-xl font-bold mb-6">QQ账号登录</h2>
+                        <div class="w-full space-y-4">
+                            <input id="qq-number-input" type="text" placeholder="请输入QQ号码" class="w-full border rounded-lg p-3">
+                            <input id="qq-password-input" type="password" placeholder="请输入密码" class="w-full border rounded-lg p-3">
+                            <button id="qq-login-submit" class="w-full bg-blue-500 text-white rounded-lg p-3 font-medium">登录</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 添加监控教程弹窗 -->
+            <div id="tutorial-modal" class="hidden phone-modal inset-0 bg-black/50 flex items-center justify-center p-4">
+                <div class="bg-white rounded-xl p-6 w-full max-w-sm">
+                    <h3 class="font-bold mb-4 text-center">如何添加群聊</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-start gap-3">
+                            <div class="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center flex-shrink-0">1</div>
+                            <div>
+                                <p class="font-medium">第一步</p>
+                                <p class="text-gray-600 text-sm">在QQ中打开想要关注的群聊</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <div class="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center flex-shrink-0">2</div>
+                            <div>
+                                <p class="font-medium">第二步</p>
+                                <p class="text-gray-600 text-sm">允许【时刻】访问该群聊信息</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-6 border-t pt-4">
+                        <img src="https://picsum.photos/300/150?random=1" class="w-full rounded-lg mb-3">
+                        <p class="text-center text-gray-500 text-sm">示意图</p>
+                    </div>
+                    <button id="close-tutorial" class="w-full bg-gray-100 rounded-lg p-3 mt-4">我知道了</button>
+                </div>
+            </div>
+            <!-- 移除群聊二次确认弹窗 -->
+            <div id="confirm-remove-group-modal" class="hidden phone-modal inset-0 bg-black/50 flex items-center justify-center p-4">
+                <div class="bg-white rounded-xl p-6 w-full max-w-sm">
+                    <h3 class="font-bold mb-2 text-center">确认移除</h3>
+                    <p class="text-gray-600 text-sm text-center mb-6">移除关注群聊则不再检测该群聊的作业、考试等信息及文档</p>
+                    <div class="flex gap-3">
+                        <button id="cancel-remove-group" class="flex-1 py-2 text-gray-600 rounded-lg border">取消</button>
+                        <button id="confirm-remove-group" class="flex-1 py-2 bg-red-500 text-white rounded-lg">确定</button>
+                    </div>
+                </div>
+            </div>
+            <!-- ZIP确认弹窗 -->
+            <div id="zip-confirm-modal" class="hidden phone-modal inset-0 bg-black/50 flex items-center justify-center p-4">
+                <div class="bg-white rounded-xl p-6 w-full max-w-sm">
+                    <div class="flex flex-col items-center">
+                        <div class="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center text-white mb-4">
+                            <i class="fa-brands fa-qq text-2xl"></i>
+                        </div>
+                        <p class="text-gray-700 text-center mb-6">是否使用QQ浏览器对文件解压缩？</p>
+                        <div class="flex gap-3 w-full">
+                            <button id="zip-cancel-btn" class="flex-1 py-2 bg-gray-100 rounded-lg">取消</button>
+                            <button id="zip-confirm-btn" class="flex-1 py-2 bg-blue-500 text-white rounded-lg">确定</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 文件预览弹窗 -->
+            <div id="file-preview-modal" class="hidden" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 1000; background: white;">
+                <div class="flex flex-col" style="height: calc(100% - 80px);">
+                    <div class="flex items-center justify-between p-4 border-b">
+                        <button id="close-preview-btn" class="text-gray-600 p-2 hover:bg-gray-100 rounded-lg" onclick="handleClosePreview()"><i class="fa-solid fa-arrow-left"></i></button>
+                        <span id="preview-file-name" class="font-medium"></span>
+                        <div class="w-6"></div>
+                    </div>
+                    <div id="preview-content" class="flex-1 overflow-y-auto p-4 pb-8">
+                        <!-- 文件预览内容 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部导航 -->
+        <div id="bottom-nav" class="absolute bottom-0 left-0 w-full h-20 bg-white border-t flex items-center justify-around px-6">
+            <button data-tab="course-tab" class="tab-btn flex flex-col items-center text-blue-500">
+                <i class="fa-solid fa-book text-xl"></i>
+                <span class="text-xs mt-1">课程</span>
+            </button>
+            <button data-tab="search-tab" class="tab-btn flex flex-col items-center text-gray-400 hover:text-blue-500">
+                <i class="fa-solid fa-search text-xl"></i>
+                <span class="text-xs mt-1">搜索</span>
+            </button>
+            <button data-tab="todo-tab" class="tab-btn flex flex-col items-center text-gray-400 hover:text-blue-500">
+                <i class="fa-solid fa-list-check text-xl"></i>
+                <span class="text-xs mt-1">待办</span>
+            </button>
+            <button data-tab="profile-tab" class="tab-btn flex flex-col items-center text-gray-400 hover:text-blue-500">
+                <i class="fa-solid fa-user text-xl"></i>
+                <span class="text-xs mt-1">个人</span>
+            </button>
+        </div>
+
+        <!-- ========== 所有弹窗都移动到手机内部 ========== -->
+        <!-- 遮罩层 -->
+        <div id="modal-overlay" class="modal-inside hidden bg-black bg-opacity-50"></div>
+        
+        <!-- 拍照选择弹窗 -->
+        <div id="camera-modal" class="phone-modal bottom-0 left-0 w-full bg-white rounded-t-2xl p-5 hidden slide-up">
+            <div class="flex justify-around mb-6">
+                <button class="flex flex-col items-center">
+                    <div class="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mb-2">
+                        <i class="fa-solid fa-camera text-blue-500 text-2xl"></i>
+                    </div>
+                    <span class="text-sm">拍照上传</span>
+                </button>
+                <button id="album-btn" class="flex flex-col items-center">
+                    <div class="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-2">
+                        <i class="fa-solid fa-image text-green-500 text-2xl"></i>
+                    </div>
+                    <span class="text-sm">从相册选择</span>
+                </button>
+            </div>
+            <button id="close-camera" class="w-full h-12 bg-gray-100 rounded-lg font-medium">取消</button>
+        </div>
+
+        <!-- 相册选择页 -->
+        <div id="album-modal" class="phone-modal inset-0 bg-white hidden p-4">
+            <div class="flex justify-between items-center mb-4">
+                <button id="close-album" class="text-gray-400">取消</button>
+                <h3 class="font-bold">选择图片</h3>
+                <button id="confirm-album" class="text-blue-500">确定</button>
+            </div>
+            <div class="border rounded p-2">
+                <img src="https://picsum.photos/200/100" class="w-full h-24 object-cover rounded">
+            </div>
+        </div>
+
+        <!-- 一键设置闹钟弹窗 - 已修复：高度自适应内容，无空白 -->
+        <div id="alarm-batch-modal" class="phone-modal inset-0 m-auto w-[85%] max-h-[85vh] bg-white rounded-xl p-5 hidden fade-scale flex flex-col">
+            <h3 class="text-center font-bold mb-4">是否一键设置课程闹钟？</h3>
+            <div class="mb-3">
+                <label class="text-sm">课前提醒：</label>
+                <input type="number" min="10" max="30" value="10" class="w-full border rounded p-2 mt-1" placeholder="输入10-30分钟">
+            </div>
+            <div class="mb-4 flex items-center">
+                <input type="checkbox" checked class="mr-2">
+                <span class="text-sm">跳过法定节假日</span>
+            </div>
+            <div class="flex gap-2 mb-3">
+                <button id="select-all" class="px-2 py-1 bg-blue-100 text-blue-600 rounded text-sm">全选</button>
+                <button id="invert-select" class="px-2 py-1 bg-gray-100 rounded text-sm">反选</button>
+            </div>
+            <div id="batch-course-list" class="space-y-2 mb-4 flex-1 overflow-y-auto">
+                <!-- 自动渲染全部课程 -->
+            </div>
+            <div class="flex gap-3 pt-3 border-t border-gray-100">
+                <button id="close-alarm-batch" class="flex-1 h-10 bg-gray-100 rounded">取消</button>
+                <button id="confirm-alarm-batch" class="flex-1 h-10 bg-blue-500 text-white rounded">确定</button>
+            </div>
+        </div>
+
+        <!-- 添加闹钟弹窗 - 已修复：高度自适应内容，无空白，完全不修改表单内容 -->
+        <div id="add-alarm-modal" class="phone-modal inset-0 m-auto w-[90%] max-h-[85vh] bg-white rounded-xl p-5 hidden fade-scale flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="alarm-modal-title" class="font-bold">添加闹钟</h3>
+                <button class="close-alarm-modal text-gray-400"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-4 flex-1 overflow-y-auto">
+                <div>
+                    <label class="text-sm block mb-1">闹钟名称 <span class="text-red-500">*</span></label>
+                    <input id="alarm-name-input" type="text" placeholder="请输入闹钟名称" class="w-full border rounded p-2">
+                </div>
+                <div>
+                    <label class="text-sm block mb-1">提醒周期 <span class="text-red-500">*</span></label>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="text-sm font-medium">单周</label>
+                            <div class="grid grid-cols-4 gap-2 mt-2">
+                                <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="alarm-period" value="single-1">周一</label>
+                                <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="alarm-period" value="single-2">周二</label>
+                                <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="alarm-period" value="single-3">周三</label>
+                                <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="alarm-period" value="single-4">周四</label>
+                                <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="alarm-period" value="single-5">周五</label>
+                                <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="alarm-period" value="single-6">周六</label>
+                                <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="alarm-period" value="single-7">周日</label>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium">双周</label>
+                            <div class="grid grid-cols-4 gap-2 mt-2">
+                                <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="alarm-period" value="double-1">周一</label>
+                                <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="alarm-period" value="double-2">周二</label>
+                                <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="alarm-period" value="double-3">周三</label>
+                                <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="alarm-period" value="double-4">周四</label>
+                                <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="alarm-period" value="double-5">周五</label>
+                                <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="alarm-period" value="double-6">周六</label>
+                                <label class="flex items-center gap-1 text-sm"><input type="checkbox" class="alarm-period" value="double-7">周日</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-sm block mb-1">时间设置 <span class="text-red-500">*</span></label>
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-2">
+                            <input type="radio" name="timeType" value="before" checked class="time-radio">
+                            <span>上课前</span>
+                            <div class="relative inline-block ml-1">
+                                <div id="minutes-select" class="border rounded p-2 w-16 cursor-pointer flex items-center justify-between" style="height: 38px;">
+                                    <span id="minutes-value">10</span>
+                                    <i class="fa-solid fa-chevron-down text-xs"></i>
+                                </div>
+                                <ul id="minutes-dropdown" class="absolute top-full left-0 w-full border rounded bg-white mt-1 hidden z-50" style="max-height: 82px; overflow-y: auto;">
+                                    <li class="p-2 cursor-pointer hover:bg-blue-50" data-value="10">10</li>
+                                    <li class="p-2 cursor-pointer hover:bg-blue-50" data-value="11">11</li>
+                                    <li class="p-2 cursor-pointer hover:bg-blue-50" data-value="12">12</li>
+                                    <li class="p-2 cursor-pointer hover:bg-blue-50" data-value="13">13</li>
+                                    <li class="p-2 cursor-pointer hover:bg-blue-50" data-value="14">14</li>
+                                    <li class="p-2 cursor-pointer hover:bg-blue-50" data-value="15">15</li>
+                                    <li class="p-2 cursor-pointer hover:bg-blue-50" data-value="16">16</li>
+                                    <li class="p-2 cursor-pointer hover:bg-blue-50" data-value="17">17</li>
+                                    <li class="p-2 cursor-pointer hover:bg-blue-50" data-value="18">18</li>
+                                    <li class="p-2 cursor-pointer hover:bg-blue-50" data-value="19">19</li>
+                                    <li class="p-2 cursor-pointer hover:bg-blue-50" data-value="20">20</li>
+                                    <li class="p-2 cursor-pointer hover:bg-blue-50" data-value="21">21</li>
+                                    <li class="p-2 cursor-pointer hover:bg-blue-50" data-value="22">22</li>
+                                    <li class="p-2 cursor-pointer hover:bg-blue-50" data-value="23">23</li>
+                                    <li class="p-2 cursor-pointer hover:bg-blue-50" data-value="24">24</li>
+                                    <li class="p-2 cursor-pointer hover:bg-blue-50" data-value="25">25</li>
+                                    <li class="p-2 cursor-pointer hover:bg-blue-50" data-value="26">26</li>
+                                    <li class="p-2 cursor-pointer hover:bg-blue-50" data-value="27">27</li>
+                                    <li class="p-2 cursor-pointer hover:bg-blue-50" data-value="28">28</li>
+                                    <li class="p-2 cursor-pointer hover:bg-blue-50" data-value="29">29</li>
+                                    <li class="p-2 cursor-pointer hover:bg-blue-50" data-value="30">30</li>
+                                </ul>
+                            </div>
+                            <span>分钟</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="radio" name="timeType" value="fixed" class="time-radio">
+                            <span>固定时间</span>
+                            <div class="flex items-center gap-1 ml-1">
+                                <div class="relative inline-block">
+                                    <input id="hour-input" type="text" value="08" class="border rounded p-2 w-14 text-center" style="height: 38px;">
+                                    <ul id="hour-dropdown" class="absolute top-full left-0 w-full border rounded bg-white mt-1 hidden z-50" style="max-height: 82px; overflow-y: auto;">
+                                    </ul>
+                                </div>
+                                <span>:</span>
+                                <div class="relative inline-block">
+                                    <input id="minute-input" type="text" value="00" class="border rounded p-2 w-14 text-center" style="height: 38px;">
+                                    <ul id="minute-dropdown" class="absolute top-full left-0 w-full border rounded bg-white mt-1 hidden z-50" style="max-height: 82px; overflow-y: auto;">
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-sm block mb-1">备注</label>
+                    <input id="alarm-desc-input" type="text" placeholder="可在此备注考试信息" class="w-full border rounded p-2">
+                </div>
+            </div>
+            <div id="alarm-error-tip" class="text-red-500 text-xs text-center mt-3 hidden">请完整输入闹钟信息</div>
+            <div class="flex gap-3 mt-4 pt-3 border-t border-gray-100">
+                <button class="close-alarm-modal flex-1 h-10 bg-gray-100 rounded">取消</button>
+                <button id="save-alarm" class="flex-1 h-10 bg-blue-500 text-white rounded">保存</button>
+            </div>
+        </div>
+
+        <!-- 确认清除弹窗 -->
+        <div id="confirm-clear-modal" class="phone-modal inset-0 m-auto w-[80%] bg-white rounded-xl p-5 hidden fade-scale">
+            <h3 class="text-center font-bold mb-4">确认清除</h3>
+            <p class="text-center text-gray-600 mb-6">清除课程信息后不能恢复，是否确认清除？</p>
+            <div class="flex gap-3">
+                <button id="cancel-clear-btn" class="flex-1 h-10 bg-gray-100 rounded">取消</button>
+                <button id="confirm-clear-btn" class="flex-1 h-10 bg-red-500 text-white rounded">确认清除</button>
+            </div>
+        </div>
+
+        <!-- 新建课程弹窗 -->
+        <div id="new-course-modal" class="phone-modal inset-0 m-auto w-[90%] max-h-[80%] bg-white rounded-xl p-5 hidden fade-scale overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold">新建课程</h3>
+                <button id="close-new-course" class="text-gray-400"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-sm block mb-1">课程名称</label>
+                    <input id="course-name" type="text" placeholder="例如：高等数学" class="w-full border rounded p-2">
+                </div>
+                <div>
+                    <label class="text-sm block mb-1">上课星期（可多选）</label>
+                    <div id="weekday-container" class="grid grid-cols-4 gap-2 border border-gray-200 rounded p-2">
+                        <label class="flex items-center gap-1"><input type="checkbox" class="weekday-checkbox" value="1">周一</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" class="weekday-checkbox" value="2">周二</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" class="weekday-checkbox" value="3">周三</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" class="weekday-checkbox" value="4">周四</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" class="weekday-checkbox" value="5">周五</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" class="weekday-checkbox" value="6">周六</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" class="weekday-checkbox" value="7">周日</label>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-sm block mb-1">上课节次（可多选）</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="flex items-start gap-2 p-2 border rounded">
+                            <input type="checkbox" class="section-checkbox mt-0.5" value="1">
+                            <div>
+                                <span class="text-sm font-medium">第一节</span>
+                                <span class="text-xs text-gray-500 block">8:30-10:00</span>
+                            </div>
+                        </label>
+                        <label class="flex items-start gap-2 p-2 border rounded">
+                            <input type="checkbox" class="section-checkbox mt-0.5" value="2">
+                            <div>
+                                <span class="text-sm font-medium">第二节</span>
+                                <span class="text-xs text-gray-500 block">10:20-11:50</span>
+                            </div>
+                        </label>
+                        <label class="flex items-start gap-2 p-2 border rounded">
+                            <input type="checkbox" class="section-checkbox mt-0.5" value="3">
+                            <div>
+                                <span class="text-sm font-medium">第三节</span>
+                                <span class="text-xs text-gray-500 block">14:00-15:30</span>
+                            </div>
+                        </label>
+                        <label class="flex items-start gap-2 p-2 border rounded">
+                            <input type="checkbox" class="section-checkbox mt-0.5" value="4">
+                            <div>
+                                <span class="text-sm font-medium">第四节</span>
+                                <span class="text-xs text-gray-500 block">15:50-17:20</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-sm block mb-1">开课周次</label>
+                    <select id="course-week-type" class="w-full border rounded p-2">
+                        <option>单周</option>
+                        <option>双周</option>
+                        <option>全部周次</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-sm block mb-1">课程颜色</label>
+                    <select id="course-color" class="w-full border rounded p-2">
+                        <option value="blue-400">蓝色</option>
+                        <option value="purple-400">紫色</option>
+                        <option value="green-400">绿色</option>
+                        <option value="orange-400">橙色</option>
+                        <option value="pink-400">粉色</option>
+                    </select>
+                </div>
+                <hr class="my-2">
+                <div>
+                    <label class="text-sm font-medium block mb-2">是否为该课程设置闹钟？</label>
+                    <div class="flex items-center gap-2 mb-2">
+                        <input id="need-alarm" type="checkbox" checked>
+                        <span>设置课前提醒</span>
+                    </div>
+                    <div id="alarm-options" class="pl-6 space-y-2">
+                        <div>
+                            <label class="text-xs block mb-1">提醒时间（10-30分钟）</label>
+                            <input type="number" min="10" max="30" value="10" id="alarm-minutes" class="w-full border rounded p-1 text-sm">
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input id="skip-holiday" type="checkbox" checked>
+                            <span class="text-xs">跳过法定节假日</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="course-form-error" class="text-red-500 text-xs text-center mt-4 hidden">请完整填写课程信息</div>
+            <div class="flex gap-3 mt-2">
+                <button id="cancel-new-course" class="flex-1 h-10 bg-gray-100 rounded">取消</button>
+                <button id="save-new-course" class="flex-1 h-10 bg-blue-500 text-white rounded">保存课程</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局状态管理
+        const state = {
+            currentTab: 'course-tab',
+            hasUploaded: false,
+            currentWeek: 1,
+            // 预设双周/单周不同课表
+            weekCourses: {
+                1: [
+                    { section: 1, weekday: 1, name: "高数", color: "blue-400" },
+                    { section: 1, weekday: 2, name: "英语", color: "purple-400" },
+                    { section: 1, weekday: 4, name: "物理", color: "green-400" },
+                    { section: 2, weekday: 3, name: "Java", color: "orange-400" },
+                    { section: 2, weekday: 5, name: "体育", color: "pink-400" },
+                    { section: 3, weekday: 1, name: "物理", color: "green-400" },
+                    { section: 3, weekday: 4, name: "高数", color: "blue-400" },
+                    { section: 4, weekday: 2, name: "Java", color: "orange-400" },
+                ],
+                2: [
+                    { section: 1, weekday: 1, name: "高数", color: "blue-400" },
+                    { section: 2, weekday: 2, name: "思政", color: "red-400" },
+                    { section: 2, weekday: 4, name: "实验", color: "cyan-400" },
+                    { section: 3, weekday: 3, name: "英语", color: "purple-400" },
+                    { section: 4, weekday: 5, name: "美术", color: "pink-400" },
+                ]
+            },
+            alarms: [],
+            todos: [
+                { id: 1, title: '完成Java作业', finished: false, time: '3小时后' },
+                { id: 2, title: '复习高数知识点', finished: false, time: '明天' },
+                { id: 3, title: '英语单词背诵', finished: true, time: '今天' },
+                { id: 4, title: '完成高数作业', finished: false, time: '2小时后' },
+                { id: 5, title: '复习线性代数', finished: false, time: '明天' },
+                { id: 6, title: '背200个单词', finished: false, time: '今天' },
+                { id: 7, title: '准备期中考试', finished: false, time: '5天后' }
+            ],
+            // 群聊列表
+            groups: [
+                { 
+                    id: 1, 
+                    name: '高等数学2', 
+                    avatar: '高', 
+                    avatarColor: 'bg-green-400',
+                    importFolder: '高等数学'
+                },
+                { 
+                    id: 2, 
+                    name: '21级计算机', 
+                    avatar: '计', 
+                    avatarColor: 'bg-orange-400',
+                    importFolder: 'JAVA'
+                }
+            ],
+            // 是否展开群聊列表
+            groupListExpanded: false,
+            // 当前待移除的群聊ID
+            pendingRemoveGroupId: null
+        }
+
+        // DOM元素
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+        const courseEmpty = document.getElementById('course-empty');
+        const courseLoaded = document.getElementById('course-loaded');
+        const courseLoading = document.getElementById('course-loading');
+        const cameraModal = document.getElementById('camera-modal');
+        const albumModal = document.getElementById('album-modal');
+        const alarmBatchModal = document.getElementById('alarm-batch-modal');
+        const addAlarmModal = document.getElementById('add-alarm-modal');
+        const alarmList = document.getElementById('alarm-list');
+        const alarmEmpty = document.getElementById('alarm-empty');
+        const modalOverlay = document.getElementById('modal-overlay');
+        const weekSelect = document.getElementById('week-select');
+        const courseGridWrapper = document.getElementById('course-grid-wrapper');
+        const reUploadBtn = document.getElementById('re-upload-btn');
+        const addCourseBtn = document.getElementById('add-course-btn');
+        const clearCourseBtn = document.getElementById('clear-course-btn');
+        const newCourseModal = document.getElementById('new-course-modal');
+        const batchCourseList = document.getElementById('batch-course-list');
+        const confirmClearModal = document.getElementById('confirm-clear-modal');
+        const cancelClearBtn = document.getElementById('cancel-clear-btn');
+        const confirmClearBtn = document.getElementById('confirm-clear-btn');
+        
+        // 搜索数据配置
+        const searchData = {
+            '高数线代': {
+                summary: '高数线代复习资料已找到：复习大纲涵盖极限、导数、积分等重点内容；线性代数笔记详细记录了矩阵运算、向量空间、特征值等知识点；期末模拟题包含3套完整试卷及答案解析。记得完成高数作业，并复习线性代数知识点。',
+                docs: [
+                    { name: '高数复习大纲.pdf', icon: 'fa-file-pdf' },
+                    { name: '线性代数笔记.md', icon: 'fa-file-code' },
+                    { name: '期末模拟题.docx', icon: 'fa-file-word' }
+                ],
+                todos: [
+                    { title: '完成高数作业', time: '2小时后' },
+                    { title: '复习线性代数', time: '明天' }
+                ]
+            },
+            '英语四级': {
+                summary: '英语四级备考资料已备好：词汇表包含高频核心词汇2000+，按词频排序便于记忆；历年真题合集收录近5年考试真题及详细解析。建议今天完成200个单词的背诵任务。',
+                docs: [
+                    { name: '四级词汇表.pdf', icon: 'fa-file-pdf' },
+                    { name: '历年真题合集.zip', icon: 'fa-file-zipper' }
+                ],
+                todos: [
+                    { title: '背200个单词', time: '今天' }
+                ]
+            },
+            'Java作业': {
+                summary: 'Java第10周作业已找到：练习文档包含面向对象编程、集合框架、IO流等章节的编程题；作业要求文档明确了提交格式和截止时间。请在3小时内完成作业。',
+                docs: [
+                    { name: '第10周练习.pdf', icon: 'fa-file-pdf' },
+                    { name: 'Java作业要求.docx', icon: 'fa-file-word' }
+                ],
+                todos: [
+                    { title: '完成Java作业', time: '3小时后' }
+                ]
+            },
+            '期末考安排': {
+                summary: '期末考试安排已整理完成：考试时间从5月20日持续至6月5日，共12门科目；考场分布图详细标注了各考场位置。记得在5天后开始准备期中考试复习。',
+                docs: [
+                    { name: '期末考试安排表.pdf', icon: 'fa-file-pdf' },
+                    { name: '考场分布图.png', icon: 'fa-image' }
+                ],
+                todos: [
+                    { title: '准备期中考试', time: '5天后' }
+                ]
+            }
+        };
+        
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            initTabs();
+            initCoursePage();
+            initAlarm();
+            initTodoList();
+            initSearchFull();
+            initWeekSwitch();
+            initNewCourseModal();
+            initBatchAlarmModal();
+            initAlarmFormLogic();
+            initFileManager();
+            initAccountManager();
+        });
+
+        // 闹钟表单互斥逻辑 + 表单校验
+        function initAlarmFormLogic(){
+            const radios = document.querySelectorAll('.time-radio');
+            radios.forEach(r => {
+                r.addEventListener('change', () => {
+                    const other = Array.from(radios).find(x => x !== r);
+                    if(r.checked) other.checked = false;
+                });
+            });
+
+            const minutesSelect = document.getElementById('minutes-select');
+            const minutesDropdown = document.getElementById('minutes-dropdown');
+            const minutesValue = document.getElementById('minutes-value');
+            
+            if (minutesSelect && minutesDropdown) {
+                minutesSelect.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    minutesDropdown.classList.toggle('hidden');
+                });
+                
+                minutesDropdown.querySelectorAll('li').forEach(li => {
+                    li.addEventListener('click', () => {
+                        minutesValue.textContent = li.dataset.value;
+                        minutesDropdown.classList.add('hidden');
+                    });
+                });
+                
+                document.addEventListener('click', () => {
+                    minutesDropdown.classList.add('hidden');
+                });
+            }
+
+            const timeSelect = document.getElementById('time-select');
+            const timeDropdown = document.getElementById('time-dropdown');
+            const timeValue = document.getElementById('time-value');
+            
+            if (timeSelect && timeDropdown) {
+                const times = [];
+                for (let h = 0; h < 24; h++) {
+                    for (let m = 0; m < 60; m += 5) {
+                        times.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+                    }
+                }
+                
+                timeDropdown.innerHTML = times.map(t => 
+                    `<li class="p-2 cursor-pointer hover:bg-blue-50" data-value="${t}">${t}</li>`
+                ).join('');
+                
+                timeSelect.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    timeDropdown.classList.toggle('hidden');
+                });
+                
+                timeDropdown.querySelectorAll('li').forEach(li => {
+                    li.addEventListener('click', () => {
+                        timeValue.textContent = li.dataset.value;
+                        timeDropdown.classList.add('hidden');
+                    });
+                });
+                
+                document.addEventListener('click', () => {
+                    timeDropdown.classList.add('hidden');
+                });
+            }
+
+            const hourInput = document.getElementById('hour-input');
+            const minuteInput = document.getElementById('minute-input');
+            const hourDropdown = document.getElementById('hour-dropdown');
+            const minuteDropdown = document.getElementById('minute-dropdown');
+            
+            if (hourDropdown && hourInput) {
+                const hours = [];
+                for (let h = 0; h < 24; h++) {
+                    hours.push(String(h).padStart(2, '0'));
+                }
+                
+                hourDropdown.innerHTML = hours.map(h => 
+                    `<li class="p-2 cursor-pointer hover:bg-blue-50 text-center" data-value="${h}">${h}</li>`
+                ).join('');
+                
+                hourInput.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    hourDropdown.classList.toggle('hidden');
+                    minuteDropdown?.classList.add('hidden');
+                });
+                
+                hourDropdown.querySelectorAll('li').forEach(li => {
+                    li.addEventListener('click', () => {
+                        hourInput.value = li.dataset.value;
+                        hourDropdown.classList.add('hidden');
+                    });
+                });
+                
+                hourInput.addEventListener('input', () => {
+                    let val = parseInt(hourInput.value);
+                    if (isNaN(val) || val < 0) val = 0;
+                    if (val > 23) val = 23;
+                    hourInput.value = String(val).padStart(2, '0');
+                });
+            }
+            
+            if (minuteDropdown && minuteInput) {
+                const minutes = [];
+                for (let m = 0; m < 60; m++) {
+                    minutes.push(String(m).padStart(2, '0'));
+                }
+                
+                minuteDropdown.innerHTML = minutes.map(m => 
+                    `<li class="p-2 cursor-pointer hover:bg-blue-50 text-center" data-value="${m}">${m}</li>`
+                ).join('');
+                
+                minuteInput.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    minuteDropdown.classList.toggle('hidden');
+                    hourDropdown?.classList.add('hidden');
+                });
+                
+                minuteDropdown.querySelectorAll('li').forEach(li => {
+                    li.addEventListener('click', () => {
+                        minuteInput.value = li.dataset.value;
+                        minuteDropdown.classList.add('hidden');
+                    });
+                });
+                
+                minuteInput.addEventListener('input', () => {
+                    let val = parseInt(minuteInput.value);
+                    if (isNaN(val) || val < 0) val = 0;
+                    if (val > 59) val = 59;
+                    minuteInput.value = String(val).padStart(2, '0');
+                });
+            }
+            
+            document.addEventListener('click', () => {
+                hourDropdown?.classList.add('hidden');
+                minuteDropdown?.classList.add('hidden');
+            });
+        }
+
+        // 周次切换
+        function initWeekSwitch() {
+            weekSelect.addEventListener('change', function() {
+                state.currentWeek = parseInt(this.value);
+                renderCourseGrid();
+            });
+        }
+
+        // 渲染当前周课表
+        function renderCourseGrid() {
+            const data = state.weekCourses[state.currentWeek];
+            const header = `
+                <div class="grid-header"></div>
+                <div class="grid-header">周一<br><span class="text-xs">20</span></div>
+                <div class="grid-header">周二<br><span class="text-xs">21</span></div>
+                <div class="grid-header">周三<br><span class="text-xs">22</span></div>
+                <div class="grid-header">周四<br><span class="text-xs">23</span></div>
+                <div class="grid-header">周五<br><span class="text-xs">24</span></div>
+                <div class="grid-header">周六<br><span class="text-xs">25</span></div>
+                <div class="grid-header">周日<br><span class="text-xs">26</span></div>
+                
+                <div class="time-cell">8:30-10:00</div>
+                <div class="course-cell" data-s="1" data-w="1"></div>
+                <div class="course-cell" data-s="1" data-w="2"></div>
+                <div class="course-cell" data-s="1" data-w="3"></div>
+                <div class="course-cell" data-s="1" data-w="4"></div>
+                <div class="course-cell" data-s="1" data-w="5"></div>
+                <div class="course-cell" data-s="1" data-w="6"></div>
+                <div class="course-cell" data-s="1" data-w="7"></div>
+                
+                <div class="time-cell">10:20-11:50</div>
+                <div class="course-cell" data-s="2" data-w="1"></div>
+                <div class="course-cell" data-s="2" data-w="2"></div>
+                <div class="course-cell" data-s="2" data-w="3"></div>
+                <div class="course-cell" data-s="2" data-w="4"></div>
+                <div class="course-cell" data-s="2" data-w="5"></div>
+                <div class="course-cell" data-s="2" data-w="6"></div>
+                <div class="course-cell" data-s="2" data-w="7"></div>
+                
+                <div class="time-cell">14:00-15:30</div>
+                <div class="course-cell" data-s="3" data-w="1"></div>
+                <div class="course-cell" data-s="3" data-w="2"></div>
+                <div class="course-cell" data-s="3" data-w="3"></div>
+                <div class="course-cell" data-s="3" data-w="4"></div>
+                <div class="course-cell" data-s="3" data-w="5"></div>
+                <div class="course-cell" data-s="3" data-w="6"></div>
+                <div class="course-cell" data-s="3" data-w="7"></div>
+                
+                <div class="time-cell">15:50-17:20</div>
+                <div class="course-cell" data-s="4" data-w="1"></div>
+                <div class="course-cell" data-s="4" data-w="2"></div>
+                <div class="course-cell" data-s="4" data-w="3"></div>
+                <div class="course-cell" data-s="4" data-w="4"></div>
+                <div class="course-cell" data-s="4" data-w="5"></div>
+                <div class="course-cell" data-s="4" data-w="6"></div>
+                <div class="course-cell" data-s="4" data-w="7"></div>
+            `;
+            courseGridWrapper.innerHTML = header;
+            const cells = courseGridWrapper.querySelectorAll('.course-cell');
+            data.forEach(item => {
+                cells.forEach(cell => {
+                    const s = parseInt(cell.dataset.s);
+                    const w = parseInt(cell.dataset.w);
+                    if (s === item.section && w === item.weekday) {
+                        cell.className = `course-cell bg-${item.color}`;
+                        cell.innerText = item.name;
+                    }
+                });
+            });
+        }
+
+        // 新建课程弹窗 - 多选版
+        function initNewCourseModal() {
+            addCourseBtn.addEventListener('click', () => {
+                newCourseModal.classList.remove('hidden');
+                modalOverlay.classList.remove('hidden');
+            });
+            document.getElementById('close-new-course').addEventListener('click', closeNewCourse);
+            document.getElementById('cancel-new-course').addEventListener('click', closeNewCourse);
+            function closeNewCourse() {
+                newCourseModal.classList.add('hidden');
+                modalOverlay.classList.add('hidden');
+            }
+            document.getElementById('save-new-course').addEventListener('click', () => {
+                const name = document.getElementById('course-name').value.trim();
+                const weekdays = Array.from(document.querySelectorAll('#new-course-modal .weekday-checkbox:checked')).map(c => parseInt(c.value));
+                const sections = Array.from(document.querySelectorAll('#new-course-modal .section-checkbox:checked')).map(c => parseInt(c.value));
+                const weekType = document.getElementById('course-week-type').value;
+                const color = document.getElementById('course-color').value;
+                const needAlarm = document.getElementById('need-alarm').checked;
+                const minutes = document.getElementById('alarm-minutes').value;
+                const skipHoliday = document.getElementById('skip-holiday').checked;
+
+                // 清除之前的错误样式
+                document.getElementById('course-name').classList.remove('border-red-500');
+                document.getElementById('weekday-container').classList.remove('border-red-500');
+                document.querySelectorAll('#new-course-modal .section-checkbox').forEach(cb => cb.parentElement.classList.remove('border-red-500'));
+                document.getElementById('course-form-error').classList.add('hidden');
+
+                // 表单校验
+                let isValid = true;
+                if (!name) {
+                    document.getElementById('course-name').classList.add('border-red-500');
+                    isValid = false;
+                }
+                if (weekdays.length === 0) {
+                    document.getElementById('weekday-container').classList.add('border-red-500');
+                    isValid = false;
+                }
+                if (sections.length === 0) {
+                    document.querySelectorAll('#new-course-modal .section-checkbox').forEach(cb => cb.parentElement.classList.add('border-red-500'));
+                    isValid = false;
+                }
+                
+                if (!isValid) {
+                    document.getElementById('course-form-error').classList.remove('hidden');
+                    return;
+                }
+
+                const weekMap = {
+                    '单周': [1],
+                    '双周': [2],
+                    '全部周次': [1,2]
+                };
+                weekMap[weekType].forEach(w => {
+                    sections.forEach(sec => {
+                        weekdays.forEach(wd => {
+                            state.weekCourses[w].push({ section: sec, weekday: wd, name, color });
+                        });
+                    });
+                });
+
+                if (needAlarm) {
+                    const weekText = weekType === '全部周次' ? '每周' : weekType;
+                    const timeMap = {1: '8:30',2: '10:20',3: '14:00',4: '15:50'};
+                    const weekdayMap = {1:'周一',2:'周二',3:'周三',4:'周四',5:'周五',6:'周六',7:'周日'};
+                    sections.forEach(sec => {
+                        weekdays.forEach(wd => {
+                            state.alarms.push({
+                                name: `${name}（课前${minutes}分钟）`,
+                                time: `${weekText} ${weekdayMap[wd]} ${timeMap[sec]}`,
+                                desc: ''
+                            });
+                        });
+                    });
+                    renderAlarmList();
+                }
+                renderCourseGrid();
+                closeNewCourse();
+            });
+
+            // 实时监听：课程名称输入时清除错误状态
+            document.getElementById('course-name').addEventListener('input', function() {
+                if (this.value.trim()) {
+                    this.classList.remove('border-red-500');
+                }
+            });
+
+            // 实时监听：上课星期勾选时清除该部分错误状态
+            document.querySelectorAll('#new-course-modal .weekday-checkbox').forEach(cb => {
+                cb.addEventListener('change', function() {
+                    const anyChecked = Array.from(document.querySelectorAll('#new-course-modal .weekday-checkbox')).some(c => c.checked);
+                    document.getElementById('weekday-container').classList.toggle('border-red-500', !anyChecked);
+                    // 只有当所有必填项都不为空时才隐藏错误提示
+                    const nameFilled = document.getElementById('course-name').value.trim();
+                    const sectionsChecked = Array.from(document.querySelectorAll('#new-course-modal .section-checkbox')).some(c => c.checked);
+                    if (nameFilled && anyChecked && sectionsChecked) {
+                        document.getElementById('course-form-error').classList.add('hidden');
+                    }
+                });
+            });
+
+            // 实时监听：上课节次勾选时清除该部分错误状态
+            document.querySelectorAll('#new-course-modal .section-checkbox').forEach(cb => {
+                cb.addEventListener('change', function() {
+                    const anyChecked = Array.from(document.querySelectorAll('#new-course-modal .section-checkbox')).some(c => c.checked);
+                    document.querySelectorAll('#new-course-modal .section-checkbox').forEach(c => {
+                        c.parentElement.classList.toggle('border-red-500', !anyChecked);
+                    });
+                    // 只有当所有必填项都不为空时才隐藏错误提示
+                    const nameFilled = document.getElementById('course-name').value.trim();
+                    const weekdaysChecked = Array.from(document.querySelectorAll('#new-course-modal .weekday-checkbox')).some(c => c.checked);
+                    if (nameFilled && anyChecked && weekdaysChecked) {
+                        document.getElementById('course-form-error').classList.add('hidden');
+                    }
+                });
+            });
+
+            document.getElementById('need-alarm').addEventListener('change', function() {
+                document.getElementById('alarm-options').style.display = this.checked ? 'block' : 'none';
+            });
+        }
+
+        // 一键设置闹钟弹窗 - 全选/反选/自适应高度
+        function initBatchAlarmModal(){
+            document.getElementById('select-all').addEventListener('click',()=>{
+                batchCourseList.querySelectorAll('input').forEach(cb => cb.checked = true);
+            });
+            document.getElementById('invert-select').addEventListener('click',()=>{
+                batchCourseList.querySelectorAll('input').forEach(cb => cb.checked = !cb.checked);
+            });
+        }
+
+        // 课程页初始化
+        function initCoursePage() {
+            courseEmpty.addEventListener('click', () => {
+                modalOverlay.classList.remove('hidden');
+                cameraModal.classList.remove('hidden');
+            });
+            reUploadBtn.addEventListener('click', () => {
+                modalOverlay.classList.remove('hidden');
+                cameraModal.classList.remove('hidden');
+            });
+            document.getElementById('close-camera').addEventListener('click', () => {
+                cameraModal.classList.add('hidden');
+                modalOverlay.classList.add('hidden');
+            });
+            document.getElementById('album-btn').addEventListener('click', () => {
+                cameraModal.classList.add('hidden');
+                albumModal.classList.remove('hidden');
+                modalOverlay.classList.remove('hidden');
+            });
+            document.getElementById('close-album').addEventListener('click', () => {
+                albumModal.classList.add('hidden');
+                cameraModal.classList.remove('hidden');
+                modalOverlay.classList.remove('hidden');
+            });
+            document.getElementById('confirm-album').addEventListener('click', () => {
+                albumModal.classList.add('hidden');
+                modalOverlay.classList.add('hidden');
+                courseEmpty.classList.add('hidden');
+                courseLoading.classList.remove('hidden');
+                setTimeout(() => {
+                    courseLoading.classList.add('hidden');
+                    courseLoaded.classList.remove('hidden');
+                    state.hasUploaded = true;
+                    renderCourseGrid();
+                    renderBatchCourseList();
+                    setTimeout(() => {
+                        modalOverlay.classList.remove('hidden');
+                        alarmBatchModal.classList.remove('hidden');
+                    }, 500);
+                }, 1500);
+            });
+            document.getElementById('close-alarm-batch').addEventListener('click', () => {
+                alarmBatchModal.classList.add('hidden');
+                modalOverlay.classList.add('hidden');
+            });
+            document.getElementById('confirm-alarm-batch').addEventListener('click', () => {
+                alarmBatchModal.classList.add('hidden');
+                modalOverlay.classList.add('hidden');
+                const selected = batchCourseList.querySelectorAll('input:checked');
+                const min = parseInt(document.querySelector('#alarm-batch-modal input[type="number"]').value) || 10;
+                let arr = [];
+                
+                selected.forEach(item => {
+                    const weekText = item.dataset.week || '每周';
+                    const originalTime = item.dataset.time;
+                    const timeMatch = originalTime.match(/(\d{2}):(\d{2})/);
+                    
+                    let alarmTime = originalTime;
+                    if (timeMatch) {
+                        let hours = parseInt(timeMatch[1]);
+                        let minutes = parseInt(timeMatch[2]) - min;
+                        
+                        if (minutes < 0) {
+                            minutes += 60;
+                            hours -= 1;
+                        }
+                        if (hours < 0) {
+                            hours += 24;
+                        }
+                        
+                        const alarmHour = String(hours).padStart(2, '0');
+                        const alarmMin = String(minutes).padStart(2, '0');
+                        const originalEndMatch = originalTime.match(/(\d{2}:\d{2})-(\d{2}:\d{2})/);
+                        
+                        if (originalEndMatch) {
+                            alarmTime = `${alarmHour}:${alarmMin}-${originalEndMatch[2]}`;
+                        } else {
+                            alarmTime = `${alarmHour}:${alarmMin}`;
+                        }
+                    }
+                    
+                    arr.push({
+                        name: item.dataset.name,
+                        time: `${weekText} ${alarmTime}`,
+                        desc: ''
+                    });
+                });
+                state.alarms = arr;
+                renderAlarmList();
+            });
+            document.getElementById('add-alarm-btn').addEventListener('click', () => {
+                // 重置表单为添加模式
+                document.getElementById('alarm-name-input').value = '';
+                document.getElementById('alarm-desc-input').value = '';
+                document.getElementById('hour-input').value = '08';
+                document.getElementById('minute-input').value = '00';
+                document.querySelectorAll('.alarm-period').forEach(cb => cb.checked = false);
+                document.querySelector('.time-radio[value="before"]').checked = true;
+                document.getElementById('alarm-modal-title').textContent = '添加闹钟';
+                delete document.getElementById('save-alarm').dataset.editIndex;
+                
+                modalOverlay.classList.remove('hidden');
+                addAlarmModal.classList.remove('hidden');
+            });
+            document.querySelectorAll('.close-alarm-modal').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.getElementById('alarm-error-tip').classList.add('hidden');
+                    addAlarmModal.classList.add('hidden');
+                    modalOverlay.classList.add('hidden');
+                });
+            });
+
+            // 清空列表（仅课程，闹钟不变）+ 二次确认
+            clearCourseBtn.addEventListener('click', () => {
+                console.log('清空按钮被点击');
+                confirmClearModal.classList.remove('hidden');
+                modalOverlay.classList.remove('hidden');
+            });
+            
+            cancelClearBtn.addEventListener('click', () => {
+                confirmClearModal.classList.add('hidden');
+                modalOverlay.classList.add('hidden');
+            });
+            
+            confirmClearBtn.addEventListener('click', () => {
+                state.weekCourses[1] = [];
+                state.weekCourses[2] = [];
+                courseLoaded.classList.add('hidden');
+                courseEmpty.classList.remove('hidden');
+                state.hasUploaded = false;
+                confirmClearModal.classList.add('hidden');
+                modalOverlay.classList.add('hidden');
+            });
+        }
+
+        // 渲染一键闹钟课程列表 - 带单双周
+        function renderBatchCourseList(){
+            const allCourses = [];
+            const wdMap = {1:'周一',2:'周二',3:'周三',4:'周四',5:'周五',6:'周六',7:'周日'};
+            const tMap = {1:'08:30',2:'10:20',3:'14:00',4:'15:50'};
+            
+            [1,2].forEach(w => {
+                state.weekCourses[w].forEach(c => {
+                    const key = `${c.name}-${c.weekday}-${c.section}-${w}`;
+                    if(!allCourses.some(x => x.key === key)){
+                        allCourses.push({
+                            ...c,
+                            key,
+                            week: w === 1 ? '单周' : '双周'
+                        });
+                    }
+                });
+            });
+            
+            batchCourseList.innerHTML = '';
+            allCourses.forEach(c => {
+                const time = `${wdMap[c.weekday]} ${tMap[c.section]}`;
+                batchCourseList.innerHTML += `
+                    <div class="flex items-center gap-2">
+                        <input type="checkbox" checked data-name="${c.name}" data-time="${time}" data-week="${c.week}">
+                        <span class="text-sm">${c.name} - ${c.week} ${time}</span>
+                    </div>
+                `;
+            });
+        }
+
+        // 闹钟列表渲染
+        function initAlarm() {
+            document.getElementById('save-alarm').addEventListener('click', () => {
+                const nameInput = document.getElementById('alarm-name-input');
+                const descInput = document.getElementById('alarm-desc-input');
+                const name = nameInput.value.trim();
+                const desc = descInput.value.trim();
+                const periods = document.querySelectorAll('.alarm-period:checked');
+                const timeChecked = document.querySelector('.time-radio:checked');
+                
+                // 表单校验
+                const errors = [];
+                if(!name) errors.push('闹钟名称');
+                if(periods.length === 0) errors.push('提醒周期');
+                if(!timeChecked) errors.push('时间设置');
+                
+                if(errors.length > 0){
+                    document.getElementById('alarm-error-tip').classList.remove('hidden');
+                    return;
+                }
+                
+                // 周期文本
+                let periodText = '';
+                const periodValues = Array.from(periods).map(p => p.value);
+                const hasSingle = periodValues.some(v => v.startsWith('single'));
+                const hasDouble = periodValues.some(v => v.startsWith('double'));
+                
+                if (hasSingle && hasDouble) {
+                    periodText = '每周';
+                } else if (hasSingle) {
+                    periodText = '单周';
+                } else {
+                    periodText = '双周';
+                }
+                
+                // 时间文本
+                let timeText = '';
+                if(timeChecked.value === 'before'){
+                    const minutesVal = document.getElementById('minutes-value')?.textContent || '10';
+                    timeText = `课前${minutesVal}分钟`;
+                } else {
+                    const hour = document.getElementById('hour-input')?.value || '08';
+                    const minute = document.getElementById('minute-input')?.value || '00';
+                    const timeVal = `${hour}:${minute}`;
+                    timeText = timeVal || '固定时间';
+                }
+                
+                // 获取编辑索引
+                const saveBtn = document.getElementById('save-alarm');
+                const editIndex = saveBtn.dataset.editIndex;
+                
+                if (editIndex !== undefined) {
+                    // 编辑模式：更新现有闹钟
+                    state.alarms[editIndex] = {
+                        name: name,
+                        time: `${periodText} ${timeText}`,
+                        desc: desc
+                    };
+                    delete saveBtn.dataset.editIndex;
+                } else {
+                    // 添加模式：创建新闹钟
+                    state.alarms.push({
+                        name: name,
+                        time: `${periodText} ${timeText}`,
+                        desc: desc
+                    });
+                }
+                
+                // 关闭并刷新
+                document.getElementById('alarm-error-tip').classList.add('hidden');
+                addAlarmModal.classList.add('hidden');
+                modalOverlay.classList.add('hidden');
+                nameInput.value = '';
+                descInput.value = '';
+                document.getElementById('alarm-modal-title').textContent = '添加闹钟';
+                renderAlarmList();
+            });
+        }
+
+        function openEditAlarm(index) {
+            const alarm = state.alarms[index];
+            document.getElementById('alarm-name-input').value = alarm.name;
+            document.getElementById('alarm-desc-input').value = alarm.desc || '';
+            
+            document.querySelectorAll('.alarm-period').forEach(cb => cb.checked = false);
+            
+            const timeStr = alarm.time;
+            if (timeStr.includes('单周') || timeStr.includes('每周')) {
+                document.querySelector('.alarm-period[value="single-1"]').checked = true;
+            }
+            if (timeStr.includes('双周') || timeStr.includes('每周')) {
+                document.querySelector('.alarm-period[value="double-1"]').checked = true;
+            }
+            
+            if (timeStr.includes('课前')) {
+                document.querySelector('.time-radio[value="before"]').checked = true;
+            } else {
+                document.querySelector('.time-radio[value="fixed"]').checked = true;
+                const timeMatch = timeStr.match(/(\d{2}):(\d{2})/);
+                if (timeMatch) {
+                    document.getElementById('hour-input').value = timeMatch[1];
+                    document.getElementById('minute-input').value = timeMatch[2];
+                }
+            }
+            
+            document.getElementById('alarm-modal-title').textContent = '编辑闹钟';
+            document.getElementById('save-alarm').dataset.editIndex = index;
+            
+            document.getElementById('modal-overlay').classList.remove('hidden');
+            document.getElementById('add-alarm-modal').classList.remove('hidden');
+        }
+        
+        function renderAlarmList() {
+            if(state.alarms.length === 0) {
+                alarmEmpty.classList.remove('hidden');
+                alarmList.classList.add('hidden');
+                return;
+            }
+            alarmEmpty.classList.add('hidden');
+            alarmList.classList.remove('hidden');
+            alarmList.innerHTML = '';
+            
+            state.alarms.forEach((alarm, index) => {
+                const item = document.createElement('div');
+                item.className = 'flex justify-between items-center p-2 bg-gray-50 rounded cursor-pointer';
+                
+                let descHtml = '';
+                if(alarm.desc){
+                    descHtml = `<span class="text-blue-500 ml-2">${alarm.desc}</span>`;
+                }
+                
+                item.innerHTML = `
+                    <div class="flex-1">
+                        <p class="font-medium">${alarm.name}</p>
+                        <p class="text-xs text-gray-500">${alarm.time} ${descHtml}</p>
+                    </div>
+                    <button class="edit-alarm text-blue-500 text-sm ml-2" data-index="${index}"><i class="fa-solid fa-pencil-alt"></i></button>
+                    <button class="delete-alarm text-red-500 text-sm ml-2" data-index="${index}">删除</button>
+                `;
+                
+                item.querySelector('.edit-alarm').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openEditAlarm(index);
+                });
+                
+                alarmList.appendChild(item);
+            });
+            
+            document.querySelectorAll('.delete-alarm').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const index = btn.dataset.index;
+                    state.alarms.splice(index, 1);
+                    renderAlarmList();
+                });
+            });
+        }
+
+        // 待办 & 搜索
+        function renderAllTodos() {
+            const unfinished = document.getElementById('unfinished-todo');
+            const finished = document.getElementById('finished-todo');
+            const searchTodo = document.getElementById('search-todo-list');
+            
+            // 按时间紧急程度排序，"完成高数作业"强制放在最前面
+            const sortedTodos = [...state.todos].sort((a, b) => {
+                if (a.title === '完成高数作业') return -1;
+                if (b.title === '完成高数作业') return 1;
+                const timePriority = { '2小时后': 0, '3小时后': 1, '今天': 2, '明天': 3, '5天后': 4 };
+                return (timePriority[a.time] || 99) - (timePriority[b.time] || 99);
+            });
+            
+            unfinished.innerHTML = '';
+            finished.innerHTML = '';
+            searchTodo.innerHTML = '';
+            sortedTodos.forEach(todo => {
+                if(!todo.finished) {
+                    unfinished.innerHTML += `
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div class="flex items-center gap-3">
+                                <input type="checkbox" class="todo-check w-5 h-5 cursor-pointer" data-id="${todo.id}">
+                                <span class="flex-1">${todo.title}</span>
+                            </div>
+                            <span class="text-red-500 text-sm font-medium">${todo.time}</span>
+                        </div>
+                    `;
+                    searchTodo.innerHTML += `
+                        <div class="flex items-center justify-between p-3 bg-white rounded-lg shadow-sm">
+                            <div class="flex items-center gap-3 flex-1">
+                                <input type="checkbox" class="search-todo-check w-5 h-5 cursor-pointer" data-id="${todo.id}">
+                                <span class="todo-title cursor-pointer flex-1">${todo.title}</span>
+                            </div>
+                            <span class="text-red-500 text-sm">${todo.time}</span>
+                        </div>
+                    `;
+                } else {
+                    finished.innerHTML += `
+                        <div class="flex items-center gap-2 p-2 text-gray-400">
+                            <input type="checkbox" checked disabled>
+                            <span class="line-through">${todo.title}</span>
+                        </div>
+                    `;
+                }
+            });
+            document.querySelectorAll('.todo-check, .search-todo-check').forEach(checkbox => {
+                checkbox.addEventListener('change', () => {
+                    const id = parseInt(checkbox.dataset.id);
+                    const todo = state.todos.find(t => t.id === id);
+                    todo.finished = true;
+                    renderAllTodos();
+                });
+            });
+        }
+        
+        function initTodoList() {
+            const voiceBtn = document.getElementById('voice-btn');
+            const voiceListening = document.getElementById('voice-listening');
+            
+            // 通知1 - 立即设置
+            document.getElementById('notice1-set-btn').addEventListener('click', () => {
+                const newId = Math.max(...state.todos.map(t => t.id), 0) + 1;
+                state.todos.push({
+                    id: newId,
+                    title: '参加期中考试',
+                    finished: false,
+                    time: '5天后'
+                });
+                document.getElementById('notice1').classList.add('hidden');
+                document.getElementById('notice1-detail').classList.add('hidden');
+                renderAllTodos();
+            });
+            
+            // 通知1 - 浏览
+            document.getElementById('notice1-browse-btn').addEventListener('click', () => {
+                const detail = document.getElementById('notice1-detail');
+                detail.classList.toggle('hidden');
+            });
+            
+            // 通知1 - 关闭
+            document.getElementById('notice1-close-btn').addEventListener('click', () => {
+                document.getElementById('notice1').classList.add('hidden');
+                document.getElementById('notice1-detail').classList.add('hidden');
+            });
+            
+            // 通知2 - 立即设置
+            document.getElementById('notice2-set-btn').addEventListener('click', () => {
+                const newId = Math.max(...state.todos.map(t => t.id), 0) + 1;
+                state.todos.push({
+                    id: newId,
+                    title: '完成21级计算机群新作业',
+                    finished: false,
+                    time: '3小时后'
+                });
+                document.getElementById('notice2').classList.add('hidden');
+                renderAllTodos();
+            });
+            
+            // 通知2 - 浏览（跳转到文件预览）
+            document.getElementById('notice2-browse-btn').addEventListener('click', () => {
+                // 切换到个人页
+                tabContents.forEach(tab => tab.classList.remove('active'));
+                tabBtns.forEach(b => { 
+                    b.classList.remove('text-blue-500'); 
+                    b.classList.add('text-gray-400'); 
+                });
+                document.getElementById('profile-tab').classList.add('active');
+                tabBtns.forEach(b => {
+                    if (b.dataset.tab === 'profile-tab') {
+                        b.classList.remove('text-gray-400');
+                        b.classList.add('text-blue-500');
+                    }
+                });
+                // 打开文件预览
+                openFileFromSearch('第10周练习.pdf');
+            });
+            
+            // 通知2 - 关闭
+            document.getElementById('notice2-close-btn').addEventListener('click', () => {
+                document.getElementById('notice2').classList.add('hidden');
+            });
+            
+            let voiceTimer = null;
+            // 语音按钮点击
+            voiceBtn.addEventListener('click', () => {
+                if (voiceBtn.classList.contains('hidden')) {
+                    // 正在录音中，点击停止
+                    clearTimeout(voiceTimer);
+                    voiceListening.classList.add('hidden');
+                    voiceBtn.classList.remove('hidden');
+                } else {
+                    // 开始录音
+                    voiceBtn.classList.add('hidden');
+                    voiceListening.classList.remove('hidden');
+                    // 3秒后恢复
+                    voiceTimer = setTimeout(() => {
+                        voiceListening.classList.add('hidden');
+                        voiceBtn.classList.remove('hidden');
+                    }, 3000);
+                }
+            });
+            
+            renderAllTodos();
+        }
+        function initSearchFull() {
+            const searchInput = document.getElementById('search-input');
+            const searchClearBtn = document.getElementById('search-clear-btn');
+            const searchFull = document.getElementById('search-full');
+            const closeSearch = document.getElementById('close-search');
+            const searchTodoList = document.getElementById('search-todo-list');
+            const searchFullInput = document.getElementById('search-full-input');
+            const searchFullClearBtn = document.getElementById('search-full-clear-btn');
+            const recentSearchArea = document.getElementById('recent-search-area');
+            const searchResultsArea = document.getElementById('search-results-area');
+            const aiSummaryCard = document.getElementById('ai-summary-card');
+            const aiSummaryText = document.getElementById('ai-summary-text');
+            const searchDocsArea = document.getElementById('search-docs-area');
+            const searchDocsList = document.getElementById('search-docs-list');
+            const searchTodosArea = document.getElementById('search-todos-area');
+            const searchTodosList = document.getElementById('search-todos-list');
+            const searchTags = document.querySelectorAll('.search-tag');
+            const voiceIcon = document.getElementById('voice-icon');
+            const voiceToTextArea = document.getElementById('voice-to-text-area');
+            const voiceStopIcon = document.getElementById('voice-stop-icon');
+            
+            // 搜索框输入监听 - 显示/隐藏清空按钮
+            searchInput.addEventListener('input', function() {
+                console.log('Input:', this.value);
+                if (this.value.length > 0) {
+                    searchClearBtn.style.display = 'inline';
+                } else {
+                    searchClearBtn.style.display = 'none';
+                }
+            });
+            
+            // 清空按钮点击
+            searchClearBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                searchInput.value = '';
+                searchClearBtn.style.display = 'none';
+            });
+            
+            // 点击搜索框进入沉浸式搜索
+            searchInput.addEventListener('click', function(e) {
+                if (e.target === searchInput) {
+                    searchFullInput.value = searchInput.value;
+                    setTimeout(() => {
+                        searchFull.classList.remove('hidden');
+                        document.getElementById('bottom-nav').style.display = 'none';
+                    }, 100);
+                }
+            });
+            
+            // 关闭沉浸式搜索
+            closeSearch.addEventListener('click', () => { 
+                exitSearchMode();
+            });
+            
+            function exitSearchMode() {
+                searchFull.classList.add('hidden');
+                document.getElementById('bottom-nav').style.display = 'flex';
+                searchInput.value = '';
+                searchClearBtn.style.display = 'none';
+                searchFullInput.value = '';
+                searchFullClearBtn.style.display = 'none';
+                recentSearchArea.classList.remove('hidden');
+                searchResultsArea.classList.add('hidden');
+                aiSummaryCard.classList.add('hidden');
+                searchDocsArea.classList.add('hidden');
+                searchTodosArea.classList.add('hidden');
+            }
+            
+            // 沉浸式搜索输入框清空功能
+            searchFullInput.addEventListener('input', function() {
+                if (this.value.length > 0) {
+                    searchFullClearBtn.style.display = 'inline';
+                } else {
+                    searchFullClearBtn.style.display = 'none';
+                }
+            });
+            
+            searchFullClearBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                searchFullInput.value = '';
+                searchFullClearBtn.style.display = 'none';
+                recentSearchArea.classList.remove('hidden');
+                searchResultsArea.classList.add('hidden');
+                aiSummaryCard.classList.add('hidden');
+                searchDocsArea.classList.add('hidden');
+                searchTodosArea.classList.add('hidden');
+            });
+            
+            // 最近搜索标签点击
+            searchTags.forEach(tag => {
+                tag.addEventListener('click', function() {
+                    const searchText = this.textContent;
+                    searchFullInput.value = searchText;
+                    searchFullClearBtn.style.display = 'inline';
+                    performSearch(searchText);
+                });
+            });
+            
+            // 点击搜索图标触发搜索
+            searchFullInput.parentElement.querySelector('.fa-magnifying-glass').parentElement.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (searchFullInput.value.trim()) {
+                    performSearch(searchFullInput.value.trim());
+                }
+            });
+            
+            // 搜索功能
+            function performSearch(searchText) {
+                recentSearchArea.classList.add('hidden');
+                searchResultsArea.classList.remove('hidden');
+                aiSummaryCard.classList.remove('hidden');
+                searchDocsArea.classList.add('hidden');
+                searchTodosArea.classList.add('hidden');
+                
+                const data = searchData[searchText];
+                typeWriter(data ? data.summary : '查无此内容', 0, data);
+            }
+            
+            // 打字机效果
+            function typeWriter(text, index, data) {
+                aiSummaryText.textContent = '';
+                let i = 0;
+                const speed = 50;
+                
+                function type() {
+                    if (i < text.length) {
+                        aiSummaryText.textContent += text.charAt(i);
+                        i++;
+                        setTimeout(type, speed);
+                    } else {
+                        if (data) {
+                            setTimeout(() => {
+                                searchDocsArea.classList.remove('hidden');
+                                searchDocsArea.classList.add('fade-in');
+                                renderSearchDocs(data.docs);
+                                setTimeout(() => {
+                                    searchTodosArea.classList.remove('hidden');
+                                    searchTodosArea.classList.add('fade-in');
+                                    renderSearchTodos(data.todos);
+                                }, 200);
+                            }, 300);
+                        }
+                    }
+                }
+                type();
+            }
+            
+            function renderSearchDocs(docs) {
+                searchDocsList.innerHTML = '';
+                docs.forEach(doc => {
+                    const item = document.createElement('div');
+                    item.className = 'flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100';
+                    item.innerHTML = `
+                        <i class="fa-solid ${doc.icon} text-blue-500 text-xl"></i>
+                        <span class="text-gray-700">${doc.name}</span>
+                    `;
+                    item.addEventListener('click', () => {
+                        exitSearchMode();
+                        tabContents.forEach(tab => tab.classList.remove('active'));
+                        tabBtns.forEach(b => { b.classList.remove('text-blue-500'); b.classList.add('text-gray-400'); });
+                        document.getElementById('profile-tab').classList.add('active');
+                        tabBtns.forEach(b => {
+                            if (b.dataset.tab === 'profile-tab') {
+                                b.classList.remove('text-gray-400');
+                                b.classList.add('text-blue-500');
+                            }
+                        });
+                        openFileFromSearch(doc.name);
+                    });
+                    searchDocsList.appendChild(item);
+                });
+            }
+            
+            function renderSearchTodos(todos) {
+                searchTodosList.innerHTML = '';
+                todos.forEach(todo => {
+                    const item = document.createElement('div');
+                    item.className = 'flex items-center gap-3 p-3 bg-gray-50 rounded-lg';
+                    item.innerHTML = `
+                        <div class="w-4 h-4 border-2 border-blue-500 rounded"></div>
+                        <div class="flex-1">
+                            <div class="font-medium">${todo.title}</div>
+                            <div class="text-sm text-red-500">${todo.time}</div>
+                        </div>
+                    `;
+                    searchTodosList.appendChild(item);
+                });
+            }
+            
+            const todoPanel = document.getElementById('todo-panel');
+            
+            // 语音图标点击 - 显示语音转文字区域
+            voiceIcon.addEventListener('click', function() {
+                voiceToTextArea.classList.remove('hidden');
+                todoPanel.style.top = '230px';
+            });
+            
+            // 点击语音转文字区域 - 关闭语音转文字
+            voiceToTextArea.addEventListener('click', function() {
+                voiceToTextArea.classList.add('hidden');
+                todoPanel.style.top = '180px';
+            });
+            
+        }
+        
+        // 文件管理器数据
+        let fileSystemData = {
+            folders: [
+                {
+                    id: 1,
+                    name: '大学物理',
+                    files: [
+                        { id: 101, name: '物理复习大纲.pdf' },
+                        { id: 102, name: '力学笔记.md' },
+                        { id: 103, name: '电磁学公式.docx' },
+                        { id: 104, name: '热学习题集.pdf' },
+                        { id: 105, name: '光学讲义.zip' }
+                    ]
+                },
+                {
+                    id: 2,
+                    name: 'JAVA',
+                    files: [
+                        { id: 201, name: '第10周练习.pdf' },
+                        { id: 202, name: 'Java作业要求.docx' },
+                        { id: 203, name: '面向对象编程笔记.md' },
+                        { id: 204, name: '集合框架教程.pdf' },
+                        { id: 205, name: 'IO流示例代码.zip' },
+                        { id: 206, name: '多线程编程.pdf' },
+                        { id: 207, name: 'Java设计模式.docx' },
+                        { id: 208, name: 'Spring框架入门.md' }
+                    ]
+                },
+                {
+                    id: 4,
+                    name: '英语四级',
+                    files: [
+                        { id: 401, name: '四级词汇表.pdf' },
+                        { id: 402, name: '历年真题合集.zip' }
+                    ]
+                },
+                {
+                    id: 3,
+                    name: '高等数学',
+                    files: [
+                        { id: 301, name: '高数复习大纲.pdf' },
+                        { id: 302, name: '线性代数笔记.md' },
+                        { id: 303, name: '期末模拟题.docx' },
+                        { id: 304, name: '微积分习题集.pdf' },
+                        { id: 305, name: '级数讲义.zip' },
+                        { id: 306, name: '常微分方程.pdf' },
+                        { id: 307, name: '向量代数笔记.md' },
+                        { id: 308, name: '空间解析几何.docx' },
+                        { id: 309, name: '多元函数微分.pdf' },
+                        { id: 310, name: '重积分习题集.md' },
+                        { id: 311, name: '曲线曲面积分.pdf' },
+                        { id: 312, name: '期末总复习.docx' }
+                    ]
+                }
+            ]
+        };
+
+        let fileSystemState = {
+            currentFolder: null,
+            selectedFolders: new Set(),
+            selectedFiles: new Set(),
+            folderBatchMode: false,
+            fileBatchMode: false,
+            previewFile: null
+        };
+
+        // 文件映射表 - 用于搜索页跳转到对应文件
+        const fileMap = {
+            '高数复习大纲.pdf': { folderId: 3, fileId: 301 },
+            '线性代数笔记.md': { folderId: 3, fileId: 302 },
+            '期末模拟题.docx': { folderId: 3, fileId: 303 },
+            '四级词汇表.pdf': { folderId: 4, fileId: 401 },
+            '历年真题合集.zip': { folderId: 4, fileId: 402 },
+            '第10周练习.pdf': { folderId: 2, fileId: 201 },
+            'Java作业要求.docx': { folderId: 2, fileId: 202 },
+            '期末考试安排表.pdf': { folderId: 3, fileId: 312 },
+            '考场分布图.png': { folderId: 3, fileId: 311 }
+        };
+
+        // 获取DOM元素
+        const folderView = document.getElementById('folder-view');
+        const fileView = document.getElementById('file-view');
+        const folderList = document.getElementById('folder-list');
+        const fileList = document.getElementById('file-list');
+        const currentFolderName = document.getElementById('current-folder-name');
+        const folderHeaderBtns = document.getElementById('folder-header-btns');
+        const folderBatchBtns = document.getElementById('folder-batch-btns');
+        const fileHeaderBtns = document.getElementById('file-header-btns');
+        const fileBatchBtns = document.getElementById('file-batch-btns');
+        const newFolderModal = document.getElementById('new-folder-modal');
+        const newFolderName = document.getElementById('new-folder-name');
+        const confirmFolderDeleteModal = document.getElementById('confirm-folder-delete-modal');
+        const confirmFileDeleteModal = document.getElementById('confirm-file-delete-modal');
+        const filePreviewModal = document.getElementById('file-preview-modal');
+        const previewFileName = document.getElementById('preview-file-name');
+        const previewContent = document.getElementById('preview-content');
+
+        // 渲染文件夹列表
+        function renderFolderList() {
+            folderList.innerHTML = '';
+            fileSystemData.folders.forEach(folder => {
+                const folderEl = document.createElement('div');
+                folderEl.className = 'flex flex-col items-center relative cursor-pointer';
+                folderEl.innerHTML = `
+                    <div class="relative">
+                        <input type="checkbox" class="folder-checkbox absolute -top-1 -left-1 w-4 h-4 ${fileSystemState.folderBatchMode ? '' : 'hidden'}" 
+                            ${fileSystemState.selectedFolders.has(folder.id) ? 'checked' : ''} data-id="${folder.id}">
+                        <i class="fa-solid fa-folder text-yellow-400 text-4xl mb-1"></i>
+                    </div>
+                    <p class="text-sm">${folder.name}</p>
+                    <p class="text-xs text-gray-400">${folder.files.length}个文件</p>
+                `;
+                folderEl.addEventListener('click', (e) => {
+                    if (!e.target.classList.contains('folder-checkbox')) {
+                        openFolder(folder.id);
+                    }
+                });
+                folderList.appendChild(folderEl);
+            });
+
+            document.querySelectorAll('.folder-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', (e) => {
+                    e.stopPropagation();
+                    const id = parseInt(e.target.dataset.id);
+                    if (e.target.checked) {
+                        fileSystemState.selectedFolders.add(id);
+                    } else {
+                        fileSystemState.selectedFolders.delete(id);
+                    }
+                });
+            });
+        }
+
+        // 渲染文件列表
+        function renderFileList() {
+            if (!fileSystemState.currentFolder) return;
+            const folder = fileSystemData.folders.find(f => f.id === fileSystemState.currentFolder);
+            if (!folder) return;
+            currentFolderName.textContent = folder.name;
+            fileList.innerHTML = '';
+            folder.files.forEach(file => {
+                const fileEl = document.createElement('div');
+                fileEl.className = 'flex items-center justify-between p-3 border rounded-lg cursor-pointer relative';
+                const ext = file.name.split('.').pop().toLowerCase();
+                let iconClass = 'fa-file';
+                let iconColor = 'text-gray-400';
+                if (['pdf'].includes(ext)) {
+                    iconClass = 'fa-file-pdf'; iconColor = 'text-red-500';
+                } else if (['doc', 'docx'].includes(ext)) {
+                    iconClass = 'fa-file-word'; iconColor = 'text-blue-500';
+                } else if (['md'].includes(ext)) {
+                    iconClass = 'fa-file-code'; iconColor = 'text-green-500';
+                } else if (['zip'].includes(ext)) {
+                    iconClass = 'fa-file-zipper'; iconColor = 'text-yellow-500';
+                } else if (['png', 'jpg', 'jpeg', 'gif'].includes(ext)) {
+                    iconClass = 'fa-image'; iconColor = 'text-purple-500';
+                }
+                fileEl.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" class="file-checkbox w-4 h-4 mr-2 ${fileSystemState.fileBatchMode ? '' : 'hidden'}" 
+                            ${fileSystemState.selectedFiles.has(file.id) ? 'checked' : ''} data-id="${file.id}">
+                        <i class="fa-solid ${iconClass} ${iconColor} text-xl"></i>
+                        <span>${file.name}</span>
+                    </div>
+                `;
+                fileEl.addEventListener('click', (e) => {
+                    if (!e.target.classList.contains('file-checkbox')) {
+                        openFilePreview(file);
+                    }
+                });
+                fileList.appendChild(fileEl);
+            });
+
+            document.querySelectorAll('.file-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', (e) => {
+                    e.stopPropagation();
+                    const id = parseInt(e.target.dataset.id);
+                    if (e.target.checked) {
+                        fileSystemState.selectedFiles.add(id);
+                    } else {
+                        fileSystemState.selectedFiles.delete(id);
+                    }
+                });
+            });
+        }
+
+        // 打开文件夹
+        function openFolder(folderId) {
+            fileSystemState.currentFolder = folderId;
+            folderView.classList.add('hidden');
+            fileView.classList.remove('hidden');
+            renderFileList();
+        }
+
+        // 返回文件夹视图
+        function backToFolderView() {
+            fileSystemState.currentFolder = null;
+            fileSystemState.fileBatchMode = false;
+            fileSystemState.selectedFiles.clear();
+            fileView.classList.add('hidden');
+            folderView.classList.remove('hidden');
+            renderFolderList();
+        }
+
+        // 打开文件预览
+        function openFilePreview(file) {
+            const ext = file.name.split('.').pop().toLowerCase();
+            
+            // ZIP文件先显示确认弹窗
+            if (['zip'].includes(ext)) {
+                const zipConfirmModal = document.getElementById('zip-confirm-modal');
+                const zipCancelBtn = document.getElementById('zip-cancel-btn');
+                const zipConfirmBtn = document.getElementById('zip-confirm-btn');
+                
+                zipConfirmModal.classList.remove('hidden');
+                
+                // 取消按钮
+                zipCancelBtn.onclick = function() {
+                    zipConfirmModal.classList.add('hidden');
+                };
+                
+                // 确定按钮
+                zipConfirmBtn.onclick = function() {
+                    zipConfirmModal.classList.add('hidden');
+                    showZipPreview(file);
+                };
+                return;
+            }
+            
+            // 其他文件直接预览
+            showFilePreview(file);
+        }
+        
+        // 显示ZIP文件预览
+        function showZipPreview(file) {
+            fileSystemState.previewFile = file;
+            previewFileName.textContent = file.name;
+            const content = `
+                <div class="flex flex-col items-center justify-center h-full">
+                    <i class="fa-solid fa-file-zipper text-yellow-500 text-6xl mb-4"></i>
+                    <p class="text-gray-600 text-center">${file.name}</p>
+                    <p class="text-gray-400 text-sm mt-2 text-center">压缩文件预览</p>
+                </div>
+            `;
+            previewContent.innerHTML = content;
+            filePreviewModal.classList.remove('hidden');
+            document.getElementById('bottom-nav').style.display = 'none';
+        }
+        
+        // 显示普通文件预览
+        function showFilePreview(file) {
+            fileSystemState.previewFile = file;
+            previewFileName.textContent = file.name;
+            const ext = file.name.split('.').pop().toLowerCase();
+            let content = '';
+            if (['pdf'].includes(ext)) {
+                content = `
+                    <div class="flex flex-col items-center justify-center h-full">
+                        <i class="fa-solid fa-file-pdf text-red-500 text-6xl mb-4"></i>
+                        <p class="text-gray-600 text-center">${file.name}</p>
+                        <p class="text-gray-400 text-sm mt-2 text-center">PDF文档预览内容</p>
+                        <div class="mt-4 w-full max-w-xs border rounded-lg p-4 bg-gray-50">
+                            <p class="text-sm text-gray-600">这是${file.name}的预览内容...</p>
+                        </div>
+                    </div>
+                `;
+            } else if (['md'].includes(ext)) {
+                content = `
+                    <div class="h-full">
+                        <i class="fa-solid fa-file-code text-green-500 text-4xl mb-4"></i>
+                        <p class="text-gray-600 font-medium mb-4">${file.name}</p>
+                        <div class="border rounded-lg p-4 bg-gray-50 font-mono text-sm">
+                            <p class="text-gray-700"># ${file.name}</p>
+                            <p class="text-gray-500 mt-2">这是Markdown文档的内容...</p>
+                        </div>
+                    </div>
+                `;
+            } else if (['doc', 'docx'].includes(ext)) {
+                content = `
+                    <div class="flex flex-col items-center justify-center h-full">
+                        <i class="fa-solid fa-file-word text-blue-500 text-6xl mb-4"></i>
+                        <p class="text-gray-600 text-center">${file.name}</p>
+                        <p class="text-gray-400 text-sm mt-2 text-center">Word文档预览内容</p>
+                        <div class="mt-4 w-full max-w-xs border rounded-lg p-4 bg-gray-50">
+                            <p class="text-sm text-gray-600">这是${file.name}的预览内容...</p>
+                        </div>
+                    </div>
+                `;
+            } else if (['png', 'jpg', 'jpeg', 'gif'].includes(ext)) {
+                content = `
+                    <div class="flex flex-col items-center justify-center h-full">
+                        <i class="fa-solid fa-image text-purple-500 text-6xl mb-4"></i>
+                        <p class="text-gray-600 text-center">${file.name}</p>
+                        <p class="text-gray-400 text-sm mt-2 text-center">图片预览</p>
+                    </div>
+                `;
+            } else {
+                content = `
+                    <div class="flex flex-col items-center justify-center h-full">
+                        <i class="fa-solid fa-file text-gray-500 text-6xl mb-4"></i>
+                        <p class="text-gray-600 text-center">${file.name}</p>
+                    </div>
+                `;
+            }
+            previewContent.innerHTML = content;
+            filePreviewModal.classList.remove('hidden');
+            document.getElementById('bottom-nav').style.display = 'none';
+        }
+
+        // 返回文件列表
+        function backToFileList() {
+            filePreviewModal.classList.add('hidden');
+            fileSystemState.previewFile = null;
+            document.getElementById('bottom-nav').style.display = 'flex';
+        }
+        
+        // 渲染群聊列表
+        function renderGroupList() {
+            const groupList = document.getElementById('group-list');
+            groupList.innerHTML = '';
+            state.groups.forEach(group => {
+                const groupEl = document.createElement('div');
+                groupEl.className = 'flex items-center justify-between';
+                groupEl.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-full ${group.avatarColor} flex items-center justify-center text-white">${group.avatar}</div>
+                        <div>
+                            <p class="text-sm">${group.name}</p>
+                            <p class="text-xs text-gray-500 cursor-pointer folder-edit-btn" data-group-id="${group.id}">
+                                导入至：${group.importFolder} <i class="fa-solid fa-pencil-alt text-gray-400"></i>
+                            </p>
+                        </div>
+                    </div>
+                    <button class="text-xs text-red-500 remove-group-btn" data-group-id="${group.id}">移除</button>
+                `;
+                groupList.appendChild(groupEl);
+            });
+
+            // 绑定移除按钮事件
+            document.querySelectorAll('.remove-group-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    state.pendingRemoveGroupId = parseInt(btn.dataset.groupId);
+                    document.getElementById('confirm-remove-group-modal').classList.remove('hidden');
+                });
+            });
+
+            // 绑定编辑导入文件夹事件
+            document.querySelectorAll('.folder-edit-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showFolderSelector(btn, parseInt(btn.dataset.groupId));
+                });
+            });
+        }
+
+        // 显示文件夹选择器
+        function showFolderSelector(targetEl, groupId) {
+            const folders = fileSystemData.folders;
+            const folderNames = folders.map(f => f.name);
+            const group = state.groups.find(g => g.id === groupId);
+            const currentFolder = group ? group.importFolder : '';
+            
+            // 创建下拉容器
+            const dropdownContainer = document.createElement('div');
+            dropdownContainer.className = 'relative inline-block';
+            
+            // 创建当前选中项显示
+            const selectedEl = document.createElement('div');
+            selectedEl.className = 'text-xs border rounded p-1 min-w-[120px] flex items-center justify-between cursor-pointer bg-white';
+            selectedEl.innerHTML = `
+                <span>${currentFolder}</span>
+                <i class="fa-solid fa-chevron-down text-gray-400 text-xs"></i>
+            `;
+            
+            // 创建下拉列表
+            const dropdownList = document.createElement('div');
+            dropdownList.className = 'absolute left-0 right-0 top-full mt-1 border rounded bg-white shadow-lg z-10 hidden';
+            
+            folderNames.forEach(name => {
+                const optionEl = document.createElement('div');
+                optionEl.className = 'px-2 py-1 text-xs cursor-pointer hover:bg-blue-50';
+                optionEl.textContent = name;
+                if (name === currentFolder) {
+                    optionEl.classList.add('bg-blue-50');
+                }
+                optionEl.addEventListener('click', () => {
+                    if (group) {
+                        group.importFolder = name;
+                    }
+                    dropdownContainer.remove();
+                    targetEl.innerHTML = `导入至：${name} <i class="fa-solid fa-pencil-alt text-gray-400"></i>`;
+                    bindFolderEditBtn(targetEl, groupId);
+                });
+                dropdownList.appendChild(optionEl);
+            });
+            
+            dropdownContainer.appendChild(selectedEl);
+            dropdownContainer.appendChild(dropdownList);
+            
+            // 切换展开/收起
+            selectedEl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dropdownList.classList.toggle('hidden');
+                const arrow = selectedEl.querySelector('i');
+                if (dropdownList.classList.contains('hidden')) {
+                    arrow.style.transform = 'rotate(0deg)';
+                } else {
+                    arrow.style.transform = 'rotate(180deg)';
+                }
+            });
+            
+            // 点击外部关闭并恢复初始状态
+            document.addEventListener('click', closeDropdown);
+            
+            function closeDropdown(e) {
+                if (!dropdownContainer.contains(e.target)) {
+                    dropdownContainer.remove();
+                    document.removeEventListener('click', closeDropdown);
+                    // 恢复初始状态
+                    targetEl.innerHTML = `导入至：${currentFolder} <i class="fa-solid fa-pencil-alt text-gray-400"></i>`;
+                    bindFolderEditBtn(targetEl, groupId);
+                }
+            }
+            
+            targetEl.innerHTML = '';
+            targetEl.appendChild(dropdownContainer);
+        }
+        
+        // 绑定文件夹编辑按钮事件
+        function bindFolderEditBtn(el, groupId) {
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                showFolderSelector(el, groupId);
+            });
+        }
+
+        // 初始化账号管理
+        function initAccountManager() {
+            const accountHeader = document.getElementById('account-header');
+            const accountArrow = document.getElementById('account-arrow');
+            const groupList = document.getElementById('group-list');
+            const addGroupBtn = document.getElementById('add-group-btn');
+            const tutorialModal = document.getElementById('tutorial-modal');
+            const confirmRemoveGroupModal = document.getElementById('confirm-remove-group-modal');
+            const qqLoginModal = document.getElementById('qq-login-modal');
+            const addAccountBtn = document.getElementById('add-account-btn');
+
+            // 渲染初始群聊列表
+            renderGroupList();
+
+            // 展开/收起群聊列表
+            accountHeader.addEventListener('click', () => {
+                state.groupListExpanded = !state.groupListExpanded;
+                if (state.groupListExpanded) {
+                    groupList.classList.remove('hidden');
+                    accountArrow.style.transform = 'rotate(180deg)';
+                } else {
+                    groupList.classList.add('hidden');
+                    accountArrow.style.transform = 'rotate(0deg)';
+                }
+            });
+
+            // 添加群聊教程弹窗
+            addGroupBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                tutorialModal.classList.remove('hidden');
+            });
+
+            // 关闭教程弹窗
+            document.getElementById('close-tutorial').addEventListener('click', () => {
+                tutorialModal.classList.add('hidden');
+            });
+            tutorialModal.addEventListener('click', (e) => {
+                if (e.target === tutorialModal) {
+                    tutorialModal.classList.add('hidden');
+                }
+            });
+
+            // 移除群聊确认
+            document.getElementById('cancel-remove-group').addEventListener('click', () => {
+                confirmRemoveGroupModal.classList.add('hidden');
+                state.pendingRemoveGroupId = null;
+            });
+            document.getElementById('confirm-remove-group').addEventListener('click', () => {
+                if (state.pendingRemoveGroupId !== null) {
+                    state.groups = state.groups.filter(g => g.id !== state.pendingRemoveGroupId);
+                    renderGroupList();
+                    confirmRemoveGroupModal.classList.add('hidden');
+                    state.pendingRemoveGroupId = null;
+                }
+            });
+
+            // 添加关联账号弹窗
+            addAccountBtn.addEventListener('click', () => {
+                qqLoginModal.classList.remove('hidden');
+                document.getElementById('bottom-nav').style.display = 'none';
+            });
+            document.getElementById('close-qq-login').addEventListener('click', () => {
+                qqLoginModal.classList.add('hidden');
+                document.getElementById('qq-number-input').value = '';
+                document.getElementById('qq-password-input').value = '';
+                document.getElementById('bottom-nav').style.display = 'flex';
+            });
+            document.getElementById('qq-login-submit').addEventListener('click', () => {
+                const qqNumber = document.getElementById('qq-number-input').value.trim();
+                const qqPassword = document.getElementById('qq-password-input').value;
+                if (qqNumber && qqPassword) {
+                    qqLoginModal.classList.add('hidden');
+                    document.getElementById('qq-number-input').value = '';
+                    document.getElementById('qq-password-input').value = '';
+                    document.getElementById('bottom-nav').style.display = 'flex';
+                    alert('登录成功！');
+                } else {
+                    alert('请输入QQ号码和密码');
+                }
+            });
+        }
+        
+        // 全局函数，供HTML onclick调用
+        window.handleClosePreview = function() {
+            backToFileList();
+        }
+
+        // 初始化文件管理器事件
+        function initFileManager() {
+            // 渲染初始文件夹列表
+            renderFolderList();
+
+            // 新建文件夹按钮
+            document.getElementById('folder-add-btn').addEventListener('click', () => {
+                newFolderModal.classList.remove('hidden');
+                newFolderName.value = '';
+                newFolderName.focus();
+            });
+            document.getElementById('cancel-new-folder').addEventListener('click', () => {
+                newFolderModal.classList.add('hidden');
+            });
+            document.getElementById('confirm-new-folder').addEventListener('click', () => {
+                const name = newFolderName.value.trim();
+                if (name) {
+                    const newId = Math.max(...fileSystemData.folders.map(f => f.id)) + 1;
+                    fileSystemData.folders.push({
+                        id: newId,
+                        name: name,
+                        files: []
+                    });
+                    newFolderModal.classList.add('hidden');
+                    renderFolderList();
+                }
+            });
+
+            // 文件夹删除模式
+            document.getElementById('folder-delete-btn').addEventListener('click', () => {
+                fileSystemState.folderBatchMode = true;
+                fileSystemState.selectedFolders.clear();
+                folderHeaderBtns.classList.add('hidden');
+                folderBatchBtns.classList.remove('hidden');
+                renderFolderList();
+            });
+            document.getElementById('folder-cancel-btn').addEventListener('click', () => {
+                fileSystemState.folderBatchMode = false;
+                fileSystemState.selectedFolders.clear();
+                folderHeaderBtns.classList.remove('hidden');
+                folderBatchBtns.classList.add('hidden');
+                renderFolderList();
+            });
+            document.getElementById('folder-confirm-delete-btn').addEventListener('click', () => {
+                if (fileSystemState.selectedFolders.size > 0) {
+                    confirmFolderDeleteModal.classList.remove('hidden');
+                }
+            });
+            document.getElementById('cancel-folder-delete').addEventListener('click', () => {
+                confirmFolderDeleteModal.classList.add('hidden');
+            });
+            document.getElementById('confirm-folder-delete').addEventListener('click', () => {
+                fileSystemData.folders = fileSystemData.folders.filter(
+                    f => !fileSystemState.selectedFolders.has(f.id)
+                );
+                fileSystemState.folderBatchMode = false;
+                fileSystemState.selectedFolders.clear();
+                folderHeaderBtns.classList.remove('hidden');
+                folderBatchBtns.classList.add('hidden');
+                confirmFolderDeleteModal.classList.add('hidden');
+                renderFolderList();
+            });
+
+            // 返回文件夹视图
+            document.getElementById('back-to-folder-btn').addEventListener('click', backToFolderView);
+
+            // 文件删除模式
+            document.getElementById('file-delete-btn').addEventListener('click', () => {
+                fileSystemState.fileBatchMode = true;
+                fileSystemState.selectedFiles.clear();
+                fileHeaderBtns.classList.add('hidden');
+                fileBatchBtns.classList.remove('hidden');
+                renderFileList();
+            });
+            document.getElementById('file-cancel-btn').addEventListener('click', () => {
+                fileSystemState.fileBatchMode = false;
+                fileSystemState.selectedFiles.clear();
+                fileHeaderBtns.classList.remove('hidden');
+                fileBatchBtns.classList.add('hidden');
+                renderFileList();
+            });
+            document.getElementById('file-confirm-delete-btn').addEventListener('click', () => {
+                if (fileSystemState.selectedFiles.size > 0) {
+                    confirmFileDeleteModal.classList.remove('hidden');
+                }
+            });
+            document.getElementById('cancel-file-delete').addEventListener('click', () => {
+                confirmFileDeleteModal.classList.add('hidden');
+            });
+            document.getElementById('confirm-file-delete').addEventListener('click', () => {
+                const folder = fileSystemData.folders.find(f => f.id === fileSystemState.currentFolder);
+                if (folder) {
+                    folder.files = folder.files.filter(
+                        f => !fileSystemState.selectedFiles.has(f.id)
+                    );
+                }
+                fileSystemState.fileBatchMode = false;
+                fileSystemState.selectedFiles.clear();
+                fileHeaderBtns.classList.remove('hidden');
+                fileBatchBtns.classList.add('hidden');
+                confirmFileDeleteModal.classList.add('hidden');
+                renderFileList();
+            });
+
+            // 返回文件列表
+            document.getElementById('close-preview-btn').addEventListener('click', backToFileList);
+        }
+
+        // 从搜索页跳转到文件预览
+        function openFileFromSearch(fileName) {
+            const mapping = fileMap[fileName];
+            if (mapping) {
+                const folder = fileSystemData.folders.find(f => f.id === mapping.folderId);
+                const file = folder?.files.find(f => f.id === mapping.fileId);
+                if (file) {
+                    fileSystemState.currentFolder = mapping.folderId;
+                    folderView.classList.add('hidden');
+                    fileView.classList.remove('hidden');
+                    renderFileList();
+                    setTimeout(() => openFilePreview(file), 100);
+                }
+            }
+        }
+
+        function initTabs() {
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const tabId = btn.dataset.tab;
+                    state.currentTab = tabId;
+                    
+                    // 关闭文件预览弹窗
+                    if (!filePreviewModal.classList.contains('hidden')) {
+                        filePreviewModal.classList.add('hidden');
+                        fileSystemState.previewFile = null;
+                    }
+                    
+                    // 如果当前在文件列表视图，返回文件夹视图
+                    if (fileView && !fileView.classList.contains('hidden')) {
+                        fileSystemState.currentFolder = null;
+                        fileSystemState.fileBatchMode = false;
+                        fileSystemState.selectedFiles.clear();
+                        fileView.classList.add('hidden');
+                        folderView.classList.remove('hidden');
+                        renderFolderList();
+                    }
+                    
+                    tabContents.forEach(tab => tab.classList.remove('active'));
+                    tabBtns.forEach(b => { b.classList.remove('text-blue-500'); b.classList.add('text-gray-400'); });
+                    document.getElementById(tabId).classList.add('active');
+                    btn.classList.remove('text-gray-400'); btn.classList.add('text-blue-500');
+                    
+                    // 切换到待办页时刷新待办列表
+                    if (tabId === 'todo-tab') {
+                        renderAllTodos();
+                    }
+                });
+            });
+        }
+    </script>
+</body>
+</html>
