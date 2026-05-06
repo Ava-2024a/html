@@ -338,7 +338,12 @@
                 </div>
                 <!-- 待办列表 -->
                 <div class="p-4 pb-24">
-                    <h3 class="font-bold mb-2">未完成</h3>
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="font-bold">未完成</h3>
+                        <button id="add-todo-btn" class="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center">
+                            <i class="fa-solid fa-plus"></i>
+                        </button>
+                    </div>
                     <div id="unfinished-todo" class="space-y-2 mb-6"></div>
                     <div class="border-t pt-4">
                         <h3 class="text-gray-500 mb-2">已完成 · 今天</h3>
@@ -743,7 +748,33 @@
                 <button id="confirm-clear-btn" class="flex-1 h-10 bg-red-500 text-white rounded">确认清除</button>
             </div>
         </div>
-
+        
+        <!-- 新建待办弹窗 -->
+        <div id="new-todo-modal" class="phone-modal inset-0 m-auto w-[90%] max-h-[40vh] bg-white rounded-xl p-3 hidden fade-scale flex flex-col">
+            <div class="flex justify-between items-center mb-2">
+                <h3 id="new-todo-title" class="font-bold">新建待办表单</h3>
+                <button class="close-todo-modal text-gray-400"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-2 flex-1 overflow-y-auto">
+                <div>
+                    <label class="text-sm block mb-1">待办内容 <span class="text-red-500">*</span></label>
+                    <input id="todo-content-input" type="text" placeholder="请输入待办内容" class="w-full border rounded p-2">
+                </div>
+                <div>
+                    <label class="text-sm block mb-1">待办时间 <span class="text-red-500">*</span></label>
+                    <div class="flex gap-2">
+                        <input id="todo-date-input" type="date" class="flex-1 border rounded p-2">
+                        <input id="todo-time-input" type="time" class="flex-1 border rounded p-2">
+                    </div>
+                </div>
+            </div>
+            <div id="todo-error-tip" class="text-red-500 text-xs text-center mt-2 hidden">请完整填写待办信息</div>
+            <div class="flex gap-3 mt-2 pt-2 border-t border-gray-100">
+                <button class="close-todo-modal flex-1 h-10 bg-gray-100 rounded">取消</button>
+                <button id="save-todo" class="flex-1 h-10 bg-blue-500 text-white rounded">保存</button>
+            </div>
+        </div>
+        
         <!-- 新建课程弹窗 -->
         <div id="new-course-modal" class="phone-modal inset-0 m-auto w-[90%] max-h-[80%] bg-white rounded-xl p-5 hidden fade-scale overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
@@ -873,13 +904,13 @@
             },
             alarms: [],
             todos: [
-                { id: 1, title: '完成Java作业', finished: false, time: '3小时后' },
-                { id: 2, title: '复习高数知识点', finished: false, time: '明天' },
-                { id: 3, title: '英语单词背诵', finished: true, time: '今天' },
-                { id: 4, title: '完成高数作业', finished: false, time: '2小时后' },
-                { id: 5, title: '复习线性代数', finished: false, time: '明天' },
-                { id: 6, title: '背200个单词', finished: false, time: '今天' },
-                { id: 7, title: '准备期中考试', finished: false, time: '5天后' }
+                { id: 1, title: '完成Java作业', finished: false, time: '2026-05-06 18:00' },
+                { id: 2, title: '复习高数知识点', finished: false, time: '2026-05-07 10:00' },
+                { id: 3, title: '英语单词背诵', finished: true, time: '2026-05-06 20:00' },
+                { id: 4, title: '完成高数作业', finished: false, time: '2026-05-06 15:00' },
+                { id: 5, title: '复习线性代数', finished: false, time: '2026-05-07 14:00' },
+                { id: 6, title: '背200个单词', finished: false, time: '2026-05-06 22:00' },
+                { id: 7, title: '准备期中考试', finished: false, time: '2026-05-11 09:00' }
             ],
             // 群聊列表
             groups: [
@@ -938,8 +969,8 @@
                     { name: '期末模拟题.docx', icon: 'fa-file-word' }
                 ],
                 todos: [
-                    { title: '完成高数作业', time: '2小时后' },
-                    { title: '复习线性代数', time: '明天' }
+                    { title: '完成高数作业', time: '2026-05-06 15:00' },
+                    { title: '复习线性代数', time: '2026-05-07 14:00' }
                 ]
             },
             '英语四级': {
@@ -949,7 +980,7 @@
                     { name: '历年真题合集.zip', icon: 'fa-file-zipper' }
                 ],
                 todos: [
-                    { title: '背200个单词', time: '今天' }
+                    { title: '背200个单词', time: '2026-05-06 22:00' }
                 ]
             },
             'Java作业': {
@@ -959,7 +990,7 @@
                     { name: 'Java作业要求.docx', icon: 'fa-file-word' }
                 ],
                 todos: [
-                    { title: '完成Java作业', time: '3小时后' }
+                    { title: '完成Java作业', time: '2026-05-06 18:00' }
                 ]
             },
             '期末考安排': {
@@ -969,7 +1000,7 @@
                     { name: '考场分布图.png', icon: 'fa-image' }
                 ],
                 todos: [
-                    { title: '准备期中考试', time: '5天后' }
+                    { title: '准备期中考试', time: '2026-05-11 09:00' }
                 ]
             }
         };
@@ -1665,8 +1696,13 @@
             const sortedTodos = [...state.todos].sort((a, b) => {
                 if (a.title === '完成高数作业') return -1;
                 if (b.title === '完成高数作业') return 1;
-                const timePriority = { '2小时后': 0, '3小时后': 1, '今天': 2, '明天': 3, '5天后': 4 };
-                return (timePriority[a.time] || 99) - (timePriority[b.time] || 99);
+                const getTime = (t) => {
+                    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(t)) {
+                        return new Date(t).getTime();
+                    }
+                    return Infinity;
+                };
+                return getTime(a.time) - getTime(b.time);
             });
             
             unfinished.innerHTML = '';
@@ -1710,10 +1746,56 @@
                 });
             });
         }
-        
+
         function initTodoList() {
             const voiceBtn = document.getElementById('voice-btn');
             const voiceListening = document.getElementById('voice-listening');
+            const newTodoModal = document.getElementById('new-todo-modal');
+            
+            // 新建待办按钮点击
+            document.getElementById('add-todo-btn').addEventListener('click', () => {
+                document.getElementById('todo-content-input').value = '';
+                document.getElementById('todo-date-input').value = '';
+                document.getElementById('todo-time-input').value = '';
+                document.getElementById('todo-error-tip').classList.add('hidden');
+                newTodoModal.classList.remove('hidden');
+                modalOverlay.classList.remove('hidden');
+            });
+            
+            // 关闭新建待办弹窗
+            document.querySelectorAll('.close-todo-modal').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    newTodoModal.classList.add('hidden');
+                    modalOverlay.classList.add('hidden');
+                    document.getElementById('todo-error-tip').classList.add('hidden');
+                });
+            });
+            
+            // 保存待办
+            document.getElementById('save-todo').addEventListener('click', () => {
+                const content = document.getElementById('todo-content-input').value.trim();
+                const date = document.getElementById('todo-date-input').value;
+                const time = document.getElementById('todo-time-input').value;
+                
+                if (!content || !date || !time) {
+                    document.getElementById('todo-error-tip').classList.remove('hidden');
+                    return;
+                }
+                
+                const newId = Math.max(...state.todos.map(t => t.id), 0) + 1;
+                state.todos.push({
+                    id: newId,
+                    title: content,
+                    finished: false,
+                    time: `${date} ${time}`
+                });
+                                
+                newTodoModal.classList.add('hidden');
+                modalOverlay.classList.add('hidden');
+                document.getElementById('todo-error-tip').classList.add('hidden');
+                renderAllTodos();
+            });
+            
             
             // 通知1 - 立即设置
             document.getElementById('notice1-set-btn').addEventListener('click', () => {
