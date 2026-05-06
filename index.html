@@ -1753,14 +1753,22 @@
             const newTodoModal = document.getElementById('new-todo-modal');
             
             // 新建待办按钮点击
-            document.getElementById('add-todo-btn').addEventListener('click', () => {
-                document.getElementById('todo-content-input').value = '';
-                document.getElementById('todo-date-input').value = '';
-                document.getElementById('todo-time-input').value = '';
-                document.getElementById('todo-error-tip').classList.add('hidden');
-                newTodoModal.classList.remove('hidden');
-                modalOverlay.classList.remove('hidden');
-            });
+        document.getElementById('add-todo-btn').addEventListener('click', () => {
+            document.getElementById('todo-content-input').value = '';
+    
+            // 设置默认日期为今天
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('todo-date-input').value = today;
+    
+            // 设置默认时间为当前时间
+           const now = new Date();
+           const timeStr = now.toTimeString().slice(0, 5);
+            document.getElementById('todo-time-input').value = timeStr;
+            
+            document.getElementById('todo-error-tip').classList.add('hidden');
+            newTodoModal.classList.remove('hidden');
+            modalOverlay.classList.remove('hidden');
+        });
             
             // 关闭新建待办弹窗
             document.querySelectorAll('.close-todo-modal').forEach(btn => {
