@@ -1297,9 +1297,20 @@
                     const weekdayMap = {1:'周一',2:'周二',3:'周三',4:'周四',5:'周五',6:'周六',7:'周日'};
                     sections.forEach(sec => {
                         weekdays.forEach(wd => {
+                            const [hour, minute] = timeMap[sec].split(':').map(Number);
+                            let alarmHour = hour;
+                            let alarmMinute = minute - Number(minutes);
+                            if (alarmMinute < 0) {
+                                alarmMinute += 60;
+                                alarmHour -= 1;
+                            }
+                            if (alarmHour < 0) {
+                                alarmHour += 24;
+                            }
+                            const alarmTime = `${String(alarmHour).padStart(2, '0')}:${String(alarmMinute).padStart(2, '0')}`;
                             state.alarms.push({
                                 name: `${name}（课前${minutes}分钟）`,
-                                time: `${weekText} ${weekdayMap[wd]} ${timeMap[sec]}`,
+                                time: `${weekText} ${weekdayMap[wd]} ${alarmTime}`,
                                 desc: ''
                             });
                         });
