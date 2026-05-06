@@ -301,7 +301,7 @@
             <!-- 待办页 -->
             <div id="todo-tab" class="tab-content">
                 <!-- 通知栏 -->
-                <div class="p-3" style="background-color: #E0EEFF;">
+                <div id="notice-container" class="p-3" style="background-color: #E0EEFF;">
                     <!-- 通知1 - 陈老师考试信息 -->
                     <div id="notice1" class="flex justify-between items-center mb-2">
                         <p class="text-sm">AI监测到用户"陈老师"发布考试时间信息</p>
@@ -1812,10 +1812,11 @@
                     id: newId,
                     title: '参加期中考试',
                     finished: false,
-                    time: '5天后'
+                    time: '2026-05-11 14:00'
                 });
                 document.getElementById('notice1').classList.add('hidden');
                 document.getElementById('notice1-detail').classList.add('hidden');
+                checkHideNoticeContainer();
                 renderAllTodos();
             });
             
@@ -1829,6 +1830,7 @@
             document.getElementById('notice1-close-btn').addEventListener('click', () => {
                 document.getElementById('notice1').classList.add('hidden');
                 document.getElementById('notice1-detail').classList.add('hidden');
+                checkHideNoticeContainer();
             });
             
             // 通知2 - 立即设置
@@ -1838,9 +1840,10 @@
                     id: newId,
                     title: '完成21级计算机群新作业',
                     finished: false,
-                    time: '3小时后'
+                    time: '2026-05-06 21:00'
                 });
                 document.getElementById('notice2').classList.add('hidden');
+                checkHideNoticeContainer();
                 renderAllTodos();
             });
             
@@ -1866,7 +1869,17 @@
             // 通知2 - 关闭
             document.getElementById('notice2-close-btn').addEventListener('click', () => {
                 document.getElementById('notice2').classList.add('hidden');
+                checkHideNoticeContainer();
             });
+            
+            function checkHideNoticeContainer() {
+                const notice1 = document.getElementById('notice1');
+                const notice2 = document.getElementById('notice2');
+                const container = document.getElementById('notice-container');
+                if (notice1.classList.contains('hidden') && notice2.classList.contains('hidden')) {
+                    container.classList.add('hidden');
+                }
+            }
             
             let voiceTimer = null;
             // 语音按钮点击
@@ -1936,6 +1949,7 @@
                     setTimeout(() => {
                         searchFull.classList.remove('hidden');
                         document.getElementById('bottom-nav').style.display = 'none';
+                        document.getElementById('todo-panel').classList.add('hidden');
                     }, 100);
                 }
             });
@@ -1957,6 +1971,7 @@
                 aiSummaryCard.classList.add('hidden');
                 searchDocsArea.classList.add('hidden');
                 searchTodosArea.classList.add('hidden');
+                document.getElementById('todo-panel').classList.remove('hidden');
             }
             
             // 沉浸式搜索输入框清空功能
